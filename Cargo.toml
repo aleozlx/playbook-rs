@@ -1,0 +1,6 @@
+[package]
+name = "playbook"
+version = "0.1.0"
+authors = ["Alex Yang <aleozlx@gmail.com>"]
+
+[dependencies]
