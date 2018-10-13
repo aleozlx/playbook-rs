@@ -3,14 +3,16 @@
 extern crate fern;
 extern crate chrono;
 extern crate yaml_rust;
+extern crate colored;
 
 use std::str;
 use std::path::Path;
 use std::fs::File;
 use std::io::prelude::*;
-use std::collections::HashSet;
+use std::collections::{HashSet, BTreeMap};
 use std::result::Result;
 use yaml_rust::{Yaml, YamlLoader};
+use colored::*;
 
 fn setup_logger() -> Result<(), fern::InitError> {
     fern::Dispatch::new()
@@ -44,9 +46,37 @@ fn white_list() -> HashSet<String> {
     output.lines().map(|i| { i.to_owned() }).collect()
 }
 
+type BuiltIn = fn(&Yaml) -> !;
+
+fn sys_exit(ctx: &Yaml) -> ! {
+    std::process::exit(0);
+}
+
+fn sys_shell(ctx: &Yaml) -> ! {
+    unimplemented!()
+}
+
 fn run_step(num_step: usize, step: &Yaml, whitelist: &HashSet<String>) {
+    let mut whitelist_sys: BTreeMap<&str, BuiltIn> = BTreeMap::new();
+    whitelist_sys.insert("sys_exit", sys_exit);
+    whitelist_sys.insert("sys_shell", sys_shell);
     if let Yaml::String(action) = &step["action"] {
-        
+        let action: &str = action;
+        if action.starts_with("step_") {
+            warn!("Action name should not be prefixed by \"step_\": {}", action);
+        }
+        if whitelist.contains(action) {
+
+        }
+        else if whitelist_sys.contains_key(action) {
+            info!("{}: {}", "Built-in".red().bold(), action);
+            // TODO context deduction
+            whitelist_sys[action](step);
+        }
+    }
+    else {
+        error!("Syntax Error: Key `action` is not a string.");
+        std::process::exit(1);
     }
 }
 

@@ -3,7 +3,8 @@ docker:
   runtime: nvidia
   gui: False
 steps:
-  - name: Show GPU status
-    action: nvidia_smi
-  - name: Shell inside the default docker environment.
-    action: sys_shell
+  - action: sys_exit
+  # - name: Show GPU status
+  #   action: nvidia_smi
+  # - name: Shell inside the default docker environment.
+  #   action: sys_shell
