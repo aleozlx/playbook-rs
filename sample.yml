@@ -1,0 +1,9 @@
+docker:
+  image: aleozlx/tkstack2:latest
+  runtime: nvidia
+  gui: False
+steps:
+  - name: Show GPU status
+    action: nvidia_smi
+  - name: Shell inside the default docker environment.
+    action: sys_shell
