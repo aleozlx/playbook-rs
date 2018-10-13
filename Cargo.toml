@@ -1,8 +1,13 @@
 [package]
 name = "playbook"
-version = "0.1.0"
+version = "1.0.0"
 authors = ["Alex Yang <aleozlx@gmail.com>"]
 
 [dependencies]
 serde = "1.0"
 serde_yaml = "0.8"
+colored = "1.6"
+log = "0.4"
+fern = "0.5"
+chrono = "*"
+clap = "2"
