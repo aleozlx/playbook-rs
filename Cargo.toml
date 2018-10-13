@@ -2,6 +2,7 @@
 name = "playbook"
 version = "1.0.0"
 authors = ["Alex Yang <aleozlx@gmail.com>"]
+description = "YAML driven Docker DevOps"
 
 [dependencies]
 serde = "1.0"
