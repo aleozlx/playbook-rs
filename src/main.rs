@@ -4,9 +4,11 @@ extern crate fern;
 extern crate chrono;
 extern crate yaml_rust;
 
+use std::str;
 use std::path::Path;
 use std::fs::File;
 use std::io::prelude::*;
+use std::collections::HashSet;
 use std::result::Result;
 use yaml_rust::{Yaml, YamlLoader};
 
@@ -35,8 +37,17 @@ fn inside_docker() -> bool {
     }
 }
 
-fn run_step(num_step: usize, step: &Yaml) {
+fn white_list() -> HashSet<String> {
+    let stdout = std::process::Command::new("find").args(&[".", "-perm", "/111", "-type", "f", "-o", "-type", "l"])
+        .output().expect("I/O error").stdout;
+    let output = str::from_utf8(&stdout).unwrap();
+    output.lines().map(|i| { i.to_owned() }).collect()
+}
 
+fn run_step(num_step: usize, step: &Yaml, whitelist: &HashSet<String>) {
+    if let Yaml::String(action) = &step["action"] {
+        
+    }
 }
 
 fn run_yaml<P: AsRef<Path>>(playbook: P, num_step: Option<usize>) -> Result<(), std::io::Error> {
@@ -47,20 +58,21 @@ fn run_yaml<P: AsRef<Path>>(playbook: P, num_step: Option<usize>) -> Result<(), 
     match YamlLoader::load_from_str(&contents) {
         Ok(config) => {
             let ref config = config[0];
+            let ref whitelist = white_list();
             if inside_docker() {
                 let num_step = num_step.unwrap();
                 let ref step = config["steps"][num_step];
-                run_step(num_step, step);
+                run_step(num_step, step, whitelist);
                 std::process::exit(0);
             }
             else {
                 if let Yaml::Array(steps) = &config["steps"] {
                     for (i_step, step) in steps.iter().enumerate() {
-                        run_step(i_step, step);
+                        run_step(i_step, step, whitelist);
                     }
                 }
                 else {
-                    error!("Syntax Error: Key `steps` is not an array,");
+                    error!("Syntax Error: Key `steps` is not an array.");
                     std::process::exit(1);
                 }
             }
