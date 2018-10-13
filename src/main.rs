@@ -8,8 +8,7 @@ use std::path::Path;
 use std::fs::File;
 use std::io::prelude::*;
 use std::result::Result;
-use std::collections::BTreeMap;
-use yaml_rust::YamlLoader;
+use yaml_rust::{Yaml, YamlLoader};
 
 fn setup_logger() -> Result<(), fern::InitError> {
     fern::Dispatch::new()
@@ -36,12 +35,41 @@ fn inside_docker() -> bool {
     }
 }
 
-fn run_yaml<P: AsRef<Path>>(playbook: P) -> Result<(), std::io::Error> {
+fn run_step(num_step: usize, step: &Yaml) {
+
+}
+
+fn run_yaml<P: AsRef<Path>>(playbook: P, num_step: Option<usize>) -> Result<(), std::io::Error> {
     // TODO propagate relocated path into ctx
     let mut file = File::open(playbook)?;
     let mut contents = String::new();
     file.read_to_string(&mut contents)?;
-    let config = YamlLoader::load_from_str(&contents);
+    match YamlLoader::load_from_str(&contents) {
+        Ok(config) => {
+            let ref config = config[0];
+            if inside_docker() {
+                let num_step = num_step.unwrap();
+                let ref step = config["steps"][num_step];
+                run_step(num_step, step);
+                std::process::exit(0);
+            }
+            else {
+                if let Yaml::Array(steps) = &config["steps"] {
+                    for (i_step, step) in steps.iter().enumerate() {
+                        run_step(i_step, step);
+                    }
+                }
+                else {
+                    error!("Syntax Error: Key `steps` is not an array,");
+                    std::process::exit(1);
+                }
+            }
+        },
+        Err(e) => {
+            error!("{}", e);
+            std::process::exit(1);
+        }
+    }
     Ok(())
 }
 
@@ -54,20 +82,25 @@ fn main() {
         (@arg RELOCATE: --relocate "Relocation of the playbook inside docker, required when using abs. path")
         (@arg PLAYBOOK: +required "YAML playbook")
     ).get_matches();
-
-    if let Err(e) = setup_logger() {
-        panic!("ERROR {}", e);
-    }
+    setup_logger().unwrap();
 
     let playbook = Path::new(matches.value_of("PLAYBOOK").unwrap());
-    let ret = if inside_docker() && playbook.is_absolute() {
-        // Absolute path to the playbook must be self-mounted with relocation specified at cmdline,
-        //   because we cannot read any content of the playbook without locating it first.
-        run_yaml(Path::new(matches.value_of("RELOCATE").expect("Missing a `--relocate` flag"))
-            .join(playbook.file_name().unwrap()))
+    let ret = if inside_docker() {
+        let num_step: usize = matches.value_of("DOCKER_STEP")
+            .expect("Missing the `--docker-step` flag").parse()
+            .expect("Cannot parse the `--docker-step` flag");
+        if playbook.is_absolute() {
+            // Absolute path to the playbook must be self-mounted with relocation specified at cmdline,
+            //   because we cannot read any content of the playbook without locating it first.
+            run_yaml(Path::new(matches.value_of("RELOCATE").expect("Missing the `--relocate` flag"))
+                .join(playbook.file_name().unwrap()), Some(num_step))
+        }
+        else {
+            run_yaml(playbook, Some(num_step))
+        }
     }
     else {
-        run_yaml(playbook)
+        run_yaml(playbook, None)
     };
     if let Err(e) = ret {
         error!("{}: {}", e, playbook.display());
