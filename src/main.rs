@@ -57,9 +57,6 @@ fn sys_shell(ctx: &Yaml) -> ! {
 }
 
 fn run_step(num_step: usize, step: &Yaml, whitelist: &HashSet<String>) {
-    let mut whitelist_sys: BTreeMap<&str, BuiltIn> = BTreeMap::new();
-    whitelist_sys.insert("sys_exit", sys_exit);
-    whitelist_sys.insert("sys_shell", sys_shell);
     if let Yaml::String(action) = &step["action"] {
         let action: &str = action;
         if action.starts_with("step_") {
@@ -68,10 +65,18 @@ fn run_step(num_step: usize, step: &Yaml, whitelist: &HashSet<String>) {
         if whitelist.contains(action) {
 
         }
-        else if whitelist_sys.contains_key(action) {
-            info!("{}: {}", "Built-in".red().bold(), action);
-            // TODO context deduction
-            whitelist_sys[action](step);
+        else{
+            let mut whitelist_sys: BTreeMap<&str, BuiltIn> = BTreeMap::new();
+            whitelist_sys.insert("sys_exit", sys_exit);
+            whitelist_sys.insert("sys_shell", sys_shell);
+            if whitelist_sys.contains_key(action) {
+                info!("{}: {}", "Built-in".red().bold(), action);
+                // TODO context deduction https://doc.rust-lang.org/std/iter/trait.Extend.html
+                whitelist_sys[action](step);
+            }
+            else {
+                warn!("Action not recognized: {}", action);
+            }
         }
     }
     else {
