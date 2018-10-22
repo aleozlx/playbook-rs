@@ -39,6 +39,9 @@ fn inside_docker() -> bool {
     }
 }
 
+/** 
+ * Creates a whitelist that is based on enumeration of files and symlinks with x permission.
+*/
 fn white_list() -> HashSet<String> {
     let stdout = std::process::Command::new("find").args(&[".", "-perm", "/111", "-type", "f", "-o", "-type", "l"])
         .output().expect("I/O error").stdout;
@@ -63,7 +66,7 @@ fn run_step(num_step: usize, step: &Yaml, whitelist: &HashSet<String>) {
             warn!("Action name should not be prefixed by \"step_\": {}", action);
         }
         if whitelist.contains(action) {
-
+            
         }
         else{
             let mut whitelist_sys: BTreeMap<&str, BuiltIn> = BTreeMap::new();
