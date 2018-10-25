@@ -14,6 +14,9 @@ use std::result::Result;
 use yaml_rust::{Yaml, YamlLoader};
 use colored::*;
 
+mod context;
+use context::{Context, ContextValue};
+
 fn setup_logger() -> Result<(), fern::InitError> {
     fern::Dispatch::new()
         .format(|out, message, record| {
@@ -43,10 +46,11 @@ fn inside_docker() -> bool {
  * Creates a whitelist that is based on enumeration of files and symlinks with x permission.
 */
 fn white_list() -> HashSet<String> {
-    let stdout = std::process::Command::new("find").args(&[".", "-perm", "/111", "-type", "f", "-o", "-type", "l"])
-        .output().expect("I/O error").stdout;
-    let output = str::from_utf8(&stdout).unwrap();
-    output.lines().map(|i| { i.to_owned() }).collect()
+    // let stdout = std::process::Command::new("find").args(&[".", "-perm", "/111", "-type", "f", "-o", "-type", "l"])
+    //     .output().expect("I/O error").stdout;
+    // let output = str::from_utf8(&stdout).unwrap();
+    // output.lines().map(|i| { i.to_owned() }).collect()
+    ["hi"].iter().map(|&i| {String::from(i)}).collect()
 }
 
 type BuiltIn = fn(&Yaml) -> !;
@@ -59,14 +63,23 @@ fn sys_shell(ctx: &Yaml) -> ! {
     unimplemented!()
 }
 
-fn run_step(num_step: usize, step: &Yaml, whitelist: &HashSet<String>) {
-    if let Yaml::String(action) = &step["action"] {
+fn run_step(num_step: usize, step: &Context, whitelist: &HashSet<String>) {
+    if let ContextValue::StringValue(action) = &step["action"] {
         let action: &str = action;
         if action.starts_with("step_") {
             warn!("Action name should not be prefixed by \"step_\": {}", action);
         }
         if whitelist.contains(action) {
-            
+            if !inside_docker() {
+                info!("Step {}: {}",
+                    (num_step+1).to_string().green().bold(),
+                    step["name"].as_str().unwrap());
+            }
+            else {
+                info!("Step {}: {}",
+                    (num_step+1).to_string().green(),
+                    step["name"].as_str().unwrap());
+            }
         }
         else{
             let mut whitelist_sys: BTreeMap<&str, BuiltIn> = BTreeMap::new();
@@ -96,10 +109,12 @@ fn run_yaml<P: AsRef<Path>>(playbook: P, num_step: Option<usize>) -> Result<(), 
     match YamlLoader::load_from_str(&contents) {
         Ok(config) => {
             let ref config = config[0];
+            let global_context = Context::from(config);
             let ref whitelist = white_list();
             if inside_docker() {
                 let num_step = num_step.unwrap();
-                let ref step = config["steps"][num_step];
+                // let ref step = config["steps"][num_step];
+                let step_context = Context::from(&config["steps"][num_step]);
                 run_step(num_step, step, whitelist);
                 std::process::exit(0);
             }
