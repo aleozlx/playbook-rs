@@ -1,13 +1,14 @@
 use yaml_rust::Yaml;
 use std::ops::Index;
 use rpds::HashTrieMap;
+use std::fmt::{Display, Formatter, Result};
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Context {
     data: HashTrieMap<String, CtxObj>
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum CtxObj {
     Str(String),
     Int(i64),
@@ -59,6 +60,18 @@ impl<'a> From<&'a Yaml> for Context {
     }
 }
 
+impl Into<String> for Context {
+    fn into(self) -> String {
+        String::from("hi")
+    }
+}
+
+impl Display for Context {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        write!(f, "(hi)")
+    }
+}
+
 impl<'a> Index<&'a str> for Context {
     type Output = CtxObj;
 
@@ -75,4 +88,12 @@ impl Context {
         }
         Context { data: ret }
     }
+}
+
+#[test]
+fn test1() {
+    let a = Context::from(&Yaml::from_str("a: 1\nb: 0"));
+    let b = Context::from(&Yaml::from_str("a: 0\nb: 1"));
+    let c = a.overlay(&b);
+    assert_eq!(c, Context::from(&Yaml::from_str("a: 1\nb: 0")));
 }

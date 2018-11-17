@@ -14,8 +14,12 @@ use std::result::Result;
 use yaml_rust::{Yaml, YamlLoader};
 use colored::*;
 
+// #[macro_use]
+// extern crate serde_derive;
+// extern crate serde_yaml;
+
 mod context;
-use context::{Context, ContextValue};
+use context::{Context, CtxObj};
 
 fn setup_logger() -> Result<(), fern::InitError> {
     fern::Dispatch::new()
@@ -64,7 +68,7 @@ fn sys_shell(ctx: &Yaml) -> ! {
 }
 
 fn run_step(num_step: usize, step: &Context, whitelist: &HashSet<String>) {
-    if let ContextValue::StringValue(action) = &step["action"] {
+    if let CtxObj::Str(action) = &step["action"] {
         let action: &str = action;
         if action.starts_with("step_") {
             warn!("Action name should not be prefixed by \"step_\": {}", action);
@@ -108,27 +112,27 @@ fn run_yaml<P: AsRef<Path>>(playbook: P, num_step: Option<usize>) -> Result<(), 
     file.read_to_string(&mut contents)?;
     match YamlLoader::load_from_str(&contents) {
         Ok(config) => {
-            let ref config = config[0];
-            let global_context = Context::from(config);
-            let ref whitelist = white_list();
-            if inside_docker() {
-                let num_step = num_step.unwrap();
-                // let ref step = config["steps"][num_step];
-                let step_context = Context::from(&config["steps"][num_step]);
-                // run_step(num_step, step, whitelist);
-                std::process::exit(0);
-            }
-            else {
-                if let Yaml::Array(steps) = &config["steps"] {
-                    for (i_step, step) in steps.iter().enumerate() {
-                        // run_step(i_step, step, whitelist);
-                    }
-                }
-                else {
-                    error!("Syntax Error: Key `steps` is not an array.");
-                    std::process::exit(1);
-                }
-            }
+            // let ref config = config[0];
+            // let global_context = Context::from(config);
+            // let ref whitelist = white_list();
+            // if inside_docker() {
+            //     let num_step = num_step.unwrap();
+            //     // let ref step = config["steps"][num_step];
+            //     let step_context = Context::from(&config["steps"][num_step]);
+            //     // run_step(num_step, step, whitelist);
+            //     std::process::exit(0);
+            // }
+            // else {
+            //     if let Yaml::Array(steps) = &config["steps"] {
+            //         for (i_step, step) in steps.iter().enumerate() {
+            //             // run_step(i_step, step, whitelist);
+            //         }
+            //     }
+            //     else {
+            //         error!("Syntax Error: Key `steps` is not an array.");
+            //         std::process::exit(1);
+            //     }
+            // }
         },
         Err(e) => {
             error!("{}", e);
@@ -138,37 +142,45 @@ fn run_yaml<P: AsRef<Path>>(playbook: P, num_step: Option<usize>) -> Result<(), 
     Ok(())
 }
 
-fn main() {
-    let matches = clap_app!(playbook =>
-        (version: crate_version!())
-        (author: crate_authors!())
-        (about: crate_description!())
-        (@arg DOCKER_STEP: --("docker-step") "For Docker use ONLY: run a specific step with docker")
-        (@arg RELOCATE: --relocate "Relocation of the playbook inside docker, required when using abs. path")
-        (@arg PLAYBOOK: +required "YAML playbook")
-    ).get_matches();
-    setup_logger().unwrap();
+extern crate rpds;
+use rpds::HashTrieMap;
 
-    let playbook = Path::new(matches.value_of("PLAYBOOK").unwrap());
-    let ret = if inside_docker() {
-        let num_step: usize = matches.value_of("DOCKER_STEP")
-            .expect("Missing the `--docker-step` flag").parse()
-            .expect("Cannot parse the `--docker-step` flag");
-        if playbook.is_absolute() {
-            // Absolute path to the playbook must be self-mounted with relocation specified at cmdline,
-            //   because we cannot read any content of the playbook without locating it first.
-            run_yaml(Path::new(matches.value_of("RELOCATE").expect("Missing the `--relocate` flag"))
-                .join(playbook.file_name().unwrap()), Some(num_step))
-        }
-        else {
-            run_yaml(playbook, Some(num_step))
-        }
-    }
-    else {
-        run_yaml(playbook, None)
-    };
-    if let Err(e) = ret {
-        error!("{}: {}", e, playbook.display());
-        std::process::exit(2);
-    }
+fn main() {
+    let a = Context::from(&Yaml::from_str("a: 1\nb: 0"));
+    println!("{}", a);
+
+    
+
+    // let matches = clap_app!(playbook =>
+    //     (version: crate_version!())
+    //     (author: crate_authors!())
+    //     (about: crate_description!())
+    //     (@arg DOCKER_STEP: --("docker-step") "For Docker use ONLY: run a specific step with docker")
+    //     (@arg RELOCATE: --relocate "Relocation of the playbook inside docker, required when using abs. path")
+    //     (@arg PLAYBOOK: +required "YAML playbook")
+    // ).get_matches();
+    // setup_logger().unwrap();
+
+    // let playbook = Path::new(matches.value_of("PLAYBOOK").unwrap());
+    // let ret = if inside_docker() {
+    //     let num_step: usize = matches.value_of("DOCKER_STEP")
+    //         .expect("Missing the `--docker-step` flag").parse()
+    //         .expect("Cannot parse the `--docker-step` flag");
+    //     if playbook.is_absolute() {
+    //         // Absolute path to the playbook must be self-mounted with relocation specified at cmdline,
+    //         //   because we cannot read any content of the playbook without locating it first.
+    //         run_yaml(Path::new(matches.value_of("RELOCATE").expect("Missing the `--relocate` flag"))
+    //             .join(playbook.file_name().unwrap()), Some(num_step))
+    //     }
+    //     else {
+    //         run_yaml(playbook, Some(num_step))
+    //     }
+    // }
+    // else {
+    //     run_yaml(playbook, None)
+    // };
+    // if let Err(e) = ret {
+    //     error!("{}: {}", e, playbook.display());
+    //     std::process::exit(2);
+    // }
 }
