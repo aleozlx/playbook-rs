@@ -3,6 +3,7 @@
 extern crate fern;
 extern crate chrono;
 extern crate yaml_rust;
+extern crate linked_hash_map;
 extern crate colored;
 
 use std::str;
@@ -143,11 +144,11 @@ fn run_yaml<P: AsRef<Path>>(playbook: P, num_step: Option<usize>) -> Result<(), 
 }
 
 extern crate rpds;
-use rpds::HashTrieMap;
 
 fn main() {
-    let a = Context::from(&Yaml::from_str("a: 1\nb: 0"));
-    println!("{}", a);
+    // let ref a_yml = YamlLoader::load_from_str(include_str!("fixtures/a.yml")).unwrap()[0];
+    let a = Context::from(YamlLoader::load_from_str(include_str!("fixtures/a.yml")).unwrap()[0].clone());
+    println!("{}", &a);
 
     
 
