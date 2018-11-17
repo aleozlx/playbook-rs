@@ -5,11 +5,12 @@ extern crate chrono;
 extern crate yaml_rust;
 extern crate colored;
 
+use std::hash::Hash;
 use std::str;
 use std::path::Path;
 use std::fs::File;
 use std::io::prelude::*;
-use std::collections::{HashSet, BTreeMap};
+use std::collections::{HashMap, HashSet, BTreeMap};
 use std::result::Result;
 use yaml_rust::{Yaml, YamlLoader};
 use colored::*;
@@ -56,7 +57,26 @@ fn sys_shell(ctx: &Yaml) -> ! {
     unimplemented!()
 }
 
-fn run_step(num_step: usize, step: &Yaml, whitelist: &HashSet<String>) {
+fn get_whitelist_sys<'a>() -> BTreeMap<&'a str, BuiltIn> {
+    let mut whitelist_sys: BTreeMap<&str, BuiltIn> = BTreeMap::new();
+    whitelist_sys.insert("sys_exit", sys_exit);
+    whitelist_sys.insert("sys_shell", sys_shell);
+    return whitelist_sys;
+}
+
+// /// Deduces task execution context
+// /// 
+// /// **Arguments**
+// /// * `step` - Step variables
+// fn context<S, G, P>(step: Option<&S>, global: &G, parser: &P)
+//   where S: Hash, G: Hash, P: Hash
+// {
+//     let mut ctx = HashMap::new();
+// }
+
+fn run_step(i_step: usize, config: &Yaml) {
+    let ref step = config["steps"][i_step];
+    let ref whitelist = white_list();
     if let Yaml::String(action) = &step["action"] {
         let action: &str = action;
         if action.starts_with("step_") {
@@ -66,13 +86,14 @@ fn run_step(num_step: usize, step: &Yaml, whitelist: &HashSet<String>) {
 
         }
         else{
-            let mut whitelist_sys: BTreeMap<&str, BuiltIn> = BTreeMap::new();
-            whitelist_sys.insert("sys_exit", sys_exit);
-            whitelist_sys.insert("sys_shell", sys_shell);
+            let whitelist_sys = get_whitelist_sys();
             if whitelist_sys.contains_key(action) {
                 info!("{}: {}", "Built-in".red().bold(), action);
                 // TODO context deduction https://doc.rust-lang.org/std/iter/trait.Extend.html
-                whitelist_sys[action](step);
+                let run = whitelist_sys[action];
+                let mut ctx = Yaml::from_str("");
+                ctx.
+                run(&ctx);
             }
             else {
                 warn!("Action not recognized: {}", action);
@@ -93,17 +114,15 @@ fn run_yaml<P: AsRef<Path>>(playbook: P, num_step: Option<usize>) -> Result<(), 
     match YamlLoader::load_from_str(&contents) {
         Ok(config) => {
             let ref config = config[0];
-            let ref whitelist = white_list();
             if inside_docker() {
-                let num_step = num_step.unwrap();
-                let ref step = config["steps"][num_step];
-                run_step(num_step, step, whitelist);
+                let i_step = num_step.unwrap();
+                run_step(i_step, config);
                 std::process::exit(0);
             }
             else {
                 if let Yaml::Array(steps) = &config["steps"] {
-                    for (i_step, step) in steps.iter().enumerate() {
-                        run_step(i_step, step, whitelist);
+                    for (i_step, _step) in steps.iter().enumerate() {
+                        run_step(i_step, config);
                     }
                 }
                 else {
@@ -121,7 +140,7 @@ fn run_yaml<P: AsRef<Path>>(playbook: P, num_step: Option<usize>) -> Result<(), 
 }
 
 fn main() {
-    let matches = clap_app!(playbook =>
+    let args = clap_app!(playbook =>
         (version: crate_version!())
         (author: crate_authors!())
         (about: crate_description!())
@@ -131,15 +150,15 @@ fn main() {
     ).get_matches();
     setup_logger().unwrap();
 
-    let playbook = Path::new(matches.value_of("PLAYBOOK").unwrap());
+    let playbook = Path::new(args.value_of("PLAYBOOK").unwrap());
     let ret = if inside_docker() {
-        let num_step: usize = matches.value_of("DOCKER_STEP")
+        let num_step: usize = args.value_of("DOCKER_STEP")
             .expect("Missing the `--docker-step` flag").parse()
             .expect("Cannot parse the `--docker-step` flag");
         if playbook.is_absolute() {
             // Absolute path to the playbook must be self-mounted with relocation specified at cmdline,
             //   because we cannot read any content of the playbook without locating it first.
-            run_yaml(Path::new(matches.value_of("RELOCATE").expect("Missing the `--relocate` flag"))
+            run_yaml(Path::new(args.value_of("RELOCATE").expect("Missing the `--relocate` flag"))
                 .join(playbook.file_name().unwrap()), Some(num_step))
         }
         else {
