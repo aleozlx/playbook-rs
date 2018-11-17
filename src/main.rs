@@ -71,14 +71,14 @@ fn run_step(num_step: usize, step: &Context, whitelist: &HashSet<String>) {
         }
         if whitelist.contains(action) {
             if !inside_docker() {
-                info!("Step {}: {}",
-                    (num_step+1).to_string().green().bold(),
-                    step["name"].as_str().unwrap());
+                // info!("Step {}: {}",
+                //     (num_step+1).to_string().green().bold(),
+                //     step["name"].as_str().unwrap());
             }
             else {
-                info!("Step {}: {}",
-                    (num_step+1).to_string().green(),
-                    step["name"].as_str().unwrap());
+                // info!("Step {}: {}",
+                //     (num_step+1).to_string().green(),
+                //     step["name"].as_str().unwrap());
             }
         }
         else{
@@ -88,7 +88,7 @@ fn run_step(num_step: usize, step: &Context, whitelist: &HashSet<String>) {
             if whitelist_sys.contains_key(action) {
                 info!("{}: {}", "Built-in".red().bold(), action);
                 // TODO context deduction https://doc.rust-lang.org/std/iter/trait.Extend.html
-                whitelist_sys[action](step);
+                // whitelist_sys[action](step);
             }
             else {
                 warn!("Action not recognized: {}", action);
@@ -115,13 +115,13 @@ fn run_yaml<P: AsRef<Path>>(playbook: P, num_step: Option<usize>) -> Result<(), 
                 let num_step = num_step.unwrap();
                 // let ref step = config["steps"][num_step];
                 let step_context = Context::from(&config["steps"][num_step]);
-                run_step(num_step, step, whitelist);
+                // run_step(num_step, step, whitelist);
                 std::process::exit(0);
             }
             else {
                 if let Yaml::Array(steps) = &config["steps"] {
                     for (i_step, step) in steps.iter().enumerate() {
-                        run_step(i_step, step, whitelist);
+                        // run_step(i_step, step, whitelist);
                     }
                 }
                 else {

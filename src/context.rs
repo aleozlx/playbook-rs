@@ -53,7 +53,7 @@ impl<'a> From<&'a Yaml> for Context {
 
 impl<'a> Extend<(&'a String, &'a ContextValue)> for Context {
     fn extend<I: IntoIterator<Item = (&'a String, &'a ContextValue)>>(&mut self, iter: I) {
-        self.data.extend(iter.into_iter().map(|(&key, &value)| (key, value)));
+        self.data.extend(iter.into_iter().map(|(ref key, ref value)| (key, value)));
     }
 }
 
