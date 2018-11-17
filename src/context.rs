@@ -1,4 +1,4 @@
-use yaml_rust::{Yaml, YamlEmitter};
+use yaml_rust::{Yaml, YamlLoader, YamlEmitter};
 use std::ops::Index;
 use rpds::HashTrieMap;
 use std::fmt::{Display, Formatter, Result};
@@ -6,7 +6,7 @@ use linked_hash_map::LinkedHashMap;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Context {
-    pub data: HashTrieMap<String, CtxObj>
+    data: HashTrieMap<String, CtxObj>
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -60,6 +60,12 @@ impl From<Yaml> for Context {
     }
 }
 
+impl<'a> From<&'a str> for Context {
+    fn from(s: &str) -> Self {
+        Context::from(YamlLoader::load_from_str(s).unwrap()[0].clone())
+    }
+}
+
 impl Into<Yaml> for Context {
     fn into(self) -> Yaml {
         let mut map = LinkedHashMap::new();
@@ -98,12 +104,16 @@ impl<'a> Index<&'a str> for Context {
 }
 
 impl Context {
-    fn overlay(&self, another: &Context) -> Context {
+    pub fn overlay(&self, another: Context) -> Context {
         let mut ret = self.data.clone();
         for (k, v) in another.data.iter() {
             ret = ret.insert(k.to_owned(), v.to_owned());
         }
         Context { data: ret }
+    }
+
+    pub fn assign(&self, key: &str, val: CtxObj) -> Context {
+        Context { data: self.data.clone().insert(key.to_owned(), val) }
     }
 }
 
@@ -112,23 +122,27 @@ mod tests{
     use yaml_rust::YamlLoader;
     use context::Context;
 
-    fn str2context(s: &str) -> Context {
-        Context::from(YamlLoader::load_from_str(&s).unwrap()[0].clone())
-    }
-
     #[test]
-    fn test1() {
-        let a = str2context(include_str!("fixtures/a.yml"));
-        let b = str2context(include_str!("fixtures/b.yml"));
-        let c = a.overlay(&b);
+    fn multiple_overwrites() {
+        let a = Context::from("a: 1\nb: 0");
+        let b = Context::from("a: 0\nb: 1");
+        let c = a.overlay(b.clone());
         assert_eq!(c, b);
     }
 
     #[test]
-    fn test2() {
-        let a = str2context(include_str!("fixtures/a.yml"));
-        let b = str2context(include_str!("fixtures/set_b.yml"));
-        let c = a.overlay(&b);
-        assert_eq!(c, str2context(include_str!("fixtures/1.yml")));
+    fn single_overwrite() {
+        let a = Context::from("a: 1\nb: 0");
+        let b = Context::from("b: 1");
+        let c = a.overlay(b);
+        assert_eq!(c, Context::from("a: 1\nb: 1"));
+    }
+
+    #[test]
+    fn insertion() {
+        let a = Context::from("a: 1\nb: 0");
+        let b = Context::from("c: 1");
+        let c = a.overlay(b);
+        assert_eq!(c, Context::from("a: 1\nb: 0\nc: 1"));
     }
 }
