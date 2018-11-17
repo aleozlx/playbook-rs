@@ -1,48 +1,56 @@
-use std::collections::BTreeMap;
 use yaml_rust::Yaml;
 use std::ops::Index;
+use rpds::HashTrieMap;
 
 #[derive(Clone)]
 pub struct Context {
-    data: BTreeMap<String, ContextValue>
+    data: HashTrieMap<String, CtxObj>
 }
 
 #[derive(Clone)]
-pub enum ContextValue {
-    StringValue(String),
-    IntValue(i64),
-    RealValue(f64),
-    BoolValue(bool),
+pub enum CtxObj {
+    Str(String),
+    Int(i64),
+    Real(f64),
+    Bool(bool),
+    Array(Vec<Context>),
     Context(Context),
     None
 }
 
 impl<'a> From<&'a Yaml> for Context {
     fn from(src: &'a Yaml) -> Self {
-        let mut context_data = BTreeMap::new();
+        let mut context_data = HashTrieMap::new();
         if let Yaml::Hash(raw) = src {
             for (k, v) in raw {
                 if let Yaml::String(key) = k {
                     match v {
-                        Yaml::String(val) => { context_data.insert(
-                            key.to_owned(), ContextValue::StringValue(val.to_owned()));
+                        Yaml::String(val) => { context_data.insert_mut(
+                            key.to_owned(), CtxObj::Str(val.to_owned()));
                         },
-                        Yaml::Boolean(val) => { context_data.insert(
-                            key.to_owned(), ContextValue::BoolValue(val.to_owned()));
+                        Yaml::Boolean(val) => { context_data.insert_mut(
+                            key.to_owned(), CtxObj::Bool(val.to_owned()));
                         },
-                        Yaml::Integer(val) => { context_data.insert(
-                            key.to_owned(), ContextValue::IntValue(val.to_owned()));
+                        Yaml::Integer(val) => { context_data.insert_mut(
+                            key.to_owned(), CtxObj::Int(val.to_owned()));
                         },
-                        Yaml::Real(val) => { context_data.insert(
-                            key.to_owned(), ContextValue::RealValue(val.parse().unwrap()));
+                        Yaml::Real(val) => { context_data.insert_mut(
+                            key.to_owned(), CtxObj::Real(val.parse().unwrap()));
                         },
-                        Yaml::Null => { context_data.insert(
-                            key.to_owned(), ContextValue::None);
+                        Yaml::Null => { context_data.insert_mut(
+                            key.to_owned(), CtxObj::None);
                         },
-                        Yaml::Hash(_) => { context_data.insert(
-                            key.to_owned(), ContextValue::Context(Context::from(v))); 
+                        Yaml::Hash(_) => { context_data.insert_mut(
+                            key.to_owned(), CtxObj::Context(Context::from(v))); 
                         },
-                        _ => ()
+                        Yaml::Array(val) => {
+                            let vv: Vec<Context> = val.iter().map(|i| {Context::from(i)}).collect();
+                            context_data.insert_mut(key.to_owned(), CtxObj::Array(vv)); 
+                        },
+                        Yaml::Alias(_val) => {
+                            unimplemented!();
+                        },
+                        Yaml::BadValue => { }
                     }
                 }
             }
@@ -51,16 +59,20 @@ impl<'a> From<&'a Yaml> for Context {
     }
 }
 
-impl<'a> Extend<(&'a String, &'a ContextValue)> for Context {
-    fn extend<I: IntoIterator<Item = (&'a String, &'a ContextValue)>>(&mut self, iter: I) {
-        self.data.extend(iter.into_iter().map(|(ref key, ref value)| (key, value)));
+impl<'a> Index<&'a str> for Context {
+    type Output = CtxObj;
+
+    fn index(&self, key: &'a str) -> &CtxObj {
+        self.data.get(key).expect("no entry found for key")
     }
 }
 
-impl<'a> Index<&'a str> for Context {
-    type Output = ContextValue;
-
-    fn index(&self, key: &'a str) -> &ContextValue {
-        self.data.get(key).expect("no entry found for key")
+impl Context {
+    fn overlay(&self, another: &Context) -> Context {
+        let mut ret = self.data.clone();
+        for (k, v) in another.data.iter() {
+            ret = ret.insert(k.to_owned(), v.to_owned());
+        }
+        Context { data: ret }
     }
 }
