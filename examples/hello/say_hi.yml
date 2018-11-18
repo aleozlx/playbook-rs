@@ -1,0 +1,14 @@
+---
+whitelist:
+- src: say_hi.py
+whoami: Host
+steps:
+- name: Running in a container
+  action: say_hi
+  docker:
+    image: frolvlad/alpine-python3
+    docker_overrides:
+      whoami: Container
+- name: Running on host
+  action: say_hi
+- action: sys_exit

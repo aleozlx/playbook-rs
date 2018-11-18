@@ -1,11 +1,11 @@
 [package]
 name = "playbook"
-version = "1.0.0"
+version = "0.1.0"
 authors = ["Alex Yang <aleozlx@gmail.com>"]
 description = "YAML driven Docker DevOps"
 
 [dependencies]
-yaml-rust = "0.4"
+yaml-rust = "^0.4"
 colored = "1.6"
 log = "0.4"
 fern = "0.5"
@@ -13,3 +13,4 @@ chrono = "*"
 clap = "2"
 ymlctx = "^0"
 pyo3 = "0.5"
+regex = "1"

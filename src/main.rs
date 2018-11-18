@@ -6,15 +6,18 @@ extern crate yaml_rust;
 extern crate ymlctx;
 extern crate colored;
 extern crate pyo3;
+extern crate regex;
 
 use std::str;
 use std::path::Path;
 use std::fs::File;
 use std::io::prelude::*;
+use std::io::BufReader;
 use std::result::Result;
+use std::collections::HashSet;
 use yaml_rust::{Yaml, YamlLoader};
 use colored::*;
-
+use regex::Regex;
 use ymlctx::context::{Context, CtxObj};
 
 const SUCCESS: i32 = 0;
@@ -48,103 +51,170 @@ fn inside_docker() -> bool {
     }
 }
 
-// /** 
-//  * Creates a whitelist that is based on enumeration of files and symlinks with x permission.
-// */
-// fn white_list() -> HashSet<String> {
-//     // let stdout = std::process::Command::new("find").args(&[".", "-perm", "/111", "-type", "f", "-o", "-type", "l"])
-//     //     .output().expect("I/O error").stdout;
-//     // let output = str::from_utf8(&stdout).unwrap();
-//     // output.lines().map(|i| { i.to_owned() }).collect()
-//     ["hi"].iter().map(|&i| {String::from(i)}).collect()
-// }
+type BuiltIn = fn(&Context) -> !;
 
-type BuiltIn = fn(&Yaml) -> !;
-
-fn sys_exit(ctx: &Yaml) -> ! {
+fn sys_exit(ctx: &Context) -> ! {
     std::process::exit(0);
 }
 
-fn sys_shell(ctx: &Yaml) -> ! {
+fn sys_shell(ctx: &Context) -> ! {
     unimplemented!()
 }
 
-fn run_step(i_step: usize, ctx_step: Context) {
-    if let Some(CtxObj::Str(action)) = &ctx_step.get("action") {
-        let action: &str = action;
-        println!("{} {}", action, ctx_step);
-        if action.starts_with("step_") {
-            warn!("Action name should not be prefixed by \"step_\": {}", action);
+fn symbols<P: AsRef<Path>>(src: P) -> Result<HashSet<String>, std::io::Error> {
+    let mut ret = HashSet::new();
+    let file = File::open(src)?;
+    let re = Regex::new(r"^#\[playbook\((\w+)\)\]").unwrap();
+    for line in BufReader::new(file).lines() {
+        let ref line = line?;
+        if let Some(caps) = re.captures(line){
+            ret.insert(caps.get(1).unwrap().as_str().to_owned());
         }
-        // if whitelist.contains(action) {
-            if !inside_docker() {
-                // info!("Step {}: {}",
-                //     (num_step+1).to_string().green().bold(),
-                //     step["name"].as_str().unwrap());
+    }
+    Ok(ret)
+}
+
+fn resolve<'step>(ctx_step: &'step Context, whitelist: &Vec<Context>) -> (Option<&'step str>, Option<Context>) {
+    let key_action;
+    if let Some(k) = ctx_step.get("action") { key_action = k; }
+    else { return (None, None); }
+    if let CtxObj::Str(action) = key_action {
+        let action: &'step str = action;
+        if action.starts_with("step_") {
+            warn!("Action name should not be prefixed by \"step_\": {}", action.cyan());
+        }
+        for ctx_source in whitelist {
+            if let Some(CtxObj::Str(src)) = ctx_source.get("src") {
+                let playbook_dir;
+                if let Some(CtxObj::Str(playbook)) = ctx_step.get("playbook") {
+                    if let Some(parent) = Path::new(playbook).parent() {
+                        playbook_dir = parent;
+                    }
+                    else {
+                        playbook_dir = Path::new(".");
+                    }
+                }
+                else { unreachable!(); }
+                let ref src_path = playbook_dir.join(src);
+                let src_path_str = src_path.to_str().unwrap();
+                debug!("Searching \"{}\" for `{}`.", src_path_str, action);
+                if let Ok(src_synbols) = symbols(src_path) {
+                    if src_synbols.contains(action) {
+                        debug!("Action `{}` has been found.", action);
+                        return(Some(action), Some(ctx_source.set("src", CtxObj::Str(src_path_str.to_owned()))));
+                    }
+                }
+                else {
+                    warn!("IO Error: {}", src_path_str);
+                }
             }
-            else {
-                // info!("Step {}: {}",
-                //     (num_step+1).to_string().green(),
-                //     step["name"].as_str().unwrap());
-            }
-        // }
-        // else{
-        //     // let whitelist_sys = get_whitelist_sys();
-        //     // if whitelist_sys.contains_key(action) {
-        //     //     info!("{}: {}", "Built-in".red().bold(), action);
-        //     //     // TODO context deduction https://doc.rust-lang.org/std/iter/trait.Extend.html
-        //     //     let run = whitelist_sys[action];
-        //     //     let mut ctx = Yaml::from_str("");
-        //     //     ctx.
-        //     //     run(&ctx);
-        //     // }
-        //     // else {
-        //     //     warn!("Action not recognized: {}", action);
-        //     // }
-        // }
+        }
+        (Some(action), None)
     }
     else {
-        error!("Syntax Error: Key `action` is not a string.");
-        std::process::exit(ERR_YML);
+        (None, None)
     }
 }
 
-fn run_yaml<P: AsRef<Path>>(playbook: P, ctx_args: Context) -> Result<(), std::io::Error> {
-    let enter_partial = |i_step: usize, ctx_partial: Context, docker_flag: bool| {
-        if docker_flag {
-            run_step(i_step, if let Some(ctx_docker) = ctx_partial.subcontext("docker").unwrap().subcontext("docker_overrides") {
-                ctx_partial.overlay(&ctx_docker).hide("docker")
+fn invoke(src: Context, ctx_step: Context) {
+    let action: &str;
+    if let Some(CtxObj::Str(action_unpacked)) = ctx_step.get("action") {
+        action = action_unpacked;
+    }
+    else { unreachable!(); }
+    let src_path: &str;
+    if let Some(CtxObj::Str(src_unpacked)) = src.get("src") {
+        src_path = src_unpacked;
+    }
+    else { unreachable!(); }
+    debug!("ctx({}@{}) =\n{}", action.cyan(), src_path.dimmed(), ctx_step);
+
+}
+
+fn run_step(ctx_step: Context) {
+    if let Some(whitelist) = ctx_step.list_contexts("whitelist") {
+        match resolve(&ctx_step, &whitelist) {
+            (Some(action), Some(ctx_source)) => {
+                let i_step: usize = ctx_step.unpack("i_step").unwrap();
+                let show_step = |for_real: bool| {
+                    let step_header = format!("Step {}", i_step+1).cyan();
+                    if let Some(CtxObj::Str(step_name)) = ctx_step.get("name") {
+                        info!("{}: {}", if for_real { step_header } else { step_header.dimmed() }, step_name);
+                    }
+                    else {
+                        info!("{}", if for_real { step_header } else { step_header.dimmed() });
+                    }
+                };
+                if let Some(CtxObj::Str(_)) = ctx_step.get("docker-step") {
+                    show_step(true);
+                }
+                else {
+                    if let Some(ctx_docker) = ctx_step.subcontext("docker") {
+                        show_step(false);
+                    }
+                    else {
+                        show_step(true);
+                        invoke(ctx_source, ctx_step.hide("whitelist").hide("i_step"));
+                    }
+                }
+            },
+            (Some(action), None) => {
+                let sys_action_wrapper = |whichever: BuiltIn| {
+                    info!("{}: {}", "Built-in".magenta(), action);
+                    whichever(&ctx_step);
+                };
+                match action {
+                    "sys_exit" => sys_action_wrapper(sys_exit),
+                    "sys_shell" => sys_action_wrapper(sys_shell),
+                    _ => ()
+                }
+                error!("Action not recognized: {}", action);
+                std::process::exit(ERR_YML);
             }
-            else { ctx_partial.hide("docker") });
+            (None, None) => {
+                error!("Syntax Error: Key `action` must be a string.");
+                std::process::exit(ERR_YML);
+            }
+            (None, Some(_)) => unreachable!()
+        }
+    }
+    else {
+        error!("Syntax Error: Key `whitelist` should be a list of mappings.");
+        std::process::exit(ERR_YML);
+    }    
+}
+
+fn run_yaml<P: AsRef<Path>>(playbook: P, ctx_args: Context) -> Result<(), std::io::Error> {
+    let enter_partial = |ctx_partial: Context| {
+        if let Some(CtxObj::Str(_)) = ctx_partial.get("docker-step") {
+            run_step(
+                if let Some(ctx_docker) = ctx_partial.subcontext("docker").unwrap().subcontext("docker_overrides") {
+                    ctx_partial.overlay(&ctx_docker).hide("docker")
+                }
+                else { ctx_partial.hide("docker") });
         }
         else {
-            run_step(i_step, ctx_partial);
+            run_step(ctx_partial);
         }
     };
     
     let enter_steps = |steps: Vec<Context>, ctx_global: Context| {
-        if let Some(str_step) = ctx_args.get("docker-step") {
-            if !inside_docker() {
-                error!("Context error: Not inside of a Docker container.");
+        if let Some(CtxObj::Str(i_step_str)) = ctx_args.get("docker-step") {
+            // ^^ Then we must be in a docker container because main() has guaranteed that.
+            if let Ok(i_step) = i_step_str.parse::<usize>() {
+                let ctx_step = steps[i_step].clone();
+                let ctx_partial = ctx_global.overlay(&ctx_step).overlay(&ctx_args);
+                enter_partial(ctx_partial.set("i_step", CtxObj::Int(i_step as i64)));
+            }
+            else {
+                error!("Syntax Error: Cannot parse the `--docker-step` flag.");
                 std::process::exit(ERR_APP);
             }
-            if let CtxObj::Str(i_step_str) = str_step {
-                if let Ok(i_step) = i_step_str.parse::<usize>() {
-                    let ctx_step = steps[i_step].clone();
-                    let ctx_partial = ctx_global.overlay(&ctx_step).overlay(&ctx_args);
-                    enter_partial(i_step, ctx_partial, true);
-                }
-                else {
-                    error!("Syntax Error: Cannot parse the `--docker-step` flag.");
-                    std::process::exit(ERR_APP);
-                }
-            }
-            else { unreachable!(); }
             std::process::exit(SUCCESS);
         }
         for (i_step, ctx_step) in steps.iter().enumerate() {
             let ctx_partial = ctx_global.overlay(&ctx_step).overlay(&ctx_args);
-            enter_partial(i_step, ctx_partial, false);
+            enter_partial(ctx_partial.set("i_step", CtxObj::Int(i_step as i64)));
         }
     };
 
@@ -163,6 +233,7 @@ fn run_yaml<P: AsRef<Path>>(playbook: P, ctx_args: Context) -> Result<(), std::i
     let mut file = File::open(playbook)?;
     let mut contents = String::new();
     file.read_to_string(&mut contents)?;
+    
     match YamlLoader::load_from_str(&contents) {
         Ok(yml_global) => { enter_global(&yml_global[0]); },
         Err(e) => {
@@ -178,7 +249,7 @@ fn main() {
         (version: crate_version!())
         (author: crate_authors!())
         (about: crate_description!())
-        (@arg DOCKER_STEP: --("docker-step") "For Docker use ONLY: run a specific step with docker")
+        (@arg DOCKER_STEP: --("docker-step") "For playbook-rs use ONLY: indicator that we have entered a container")
         (@arg RELOCATE: --relocate "Relocation of the playbook inside docker, required when using abs. path")
         (@arg PLAYBOOK: +required "YAML playbook")
     ).get_matches();
