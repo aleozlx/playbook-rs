@@ -109,25 +109,33 @@ fn run_step(num_step: usize, step: Context) {
     }
 }
 
-fn run_yaml<P: AsRef<Path>>(playbook: P, args: Context) -> Result<(), std::io::Error> {
-    // TODO propagate relocated path into ctx
+fn run_yaml<P: AsRef<Path>>(playbook: P, ctx_args: Context) -> Result<(), std::io::Error> {
     let mut file = File::open(playbook)?;
     let mut contents = String::new();
     file.read_to_string(&mut contents)?;
     match YamlLoader::load_from_str(&contents) {
-        Ok(config) => {
-            let ref config = config[0];
-            let raw = Context::from(config.to_owned());
+        Ok(yml_global) => {
+            let ref yml_global = yml_global[0];
+            let raw = Context::from(yml_global.to_owned());
             let ctx_global = raw.hide("steps").hide("docker");
 
-            if inside_docker() {
-                if let Some(i_step_str) = ctx_global.get("docker-step") {
-                    if let CtxObj::Str(i_step_str) = i_step_str {
-                        let i_step: usize = i_step_str.parse().expect("Cannot parse the `--docker-step` flag");
+            if let Some(str_step) = ctx_args.get("docker-step") {
+                if !inside_docker() {
+                    error!("Context error: Not inside of a Docker container.");
+                    std::process::exit(ERR_APP);
+                }
+                if let CtxObj::Str(i_step_str) = str_step {
+                    if let Ok(i_step) = i_step_str.parse::<usize>() {
                         match raw.list_contexts("steps") {
                             Some(steps) => {
-                                let ref ctx_step = steps[i_step];
-                                run_step(i_step, ctx_global.overlay(ctx_step));
+                                let ctx_step = &steps[i_step];
+                                let ctx_partial = ctx_global.overlay(&ctx_step).overlay(&ctx_args);
+                                if let Some(ctx_docker) = ctx_partial.subcontext("docker").unwrap().subcontext("docker_overrides") {
+                                    run_step(i_step, ctx_partial.overlay(&ctx_docker).hide("docker"));
+                                }
+                                else {
+                                    run_step(i_step, ctx_partial.hide("docker"));
+                                }
                             }
                             None => {
                                 error!("Syntax Error: Key `steps` is not an array.");
@@ -135,18 +143,19 @@ fn run_yaml<P: AsRef<Path>>(playbook: P, args: Context) -> Result<(), std::io::E
                             }
                         }
                     }
-                    else { unreachable!(); }
+                    else {
+                        error!("Syntax Error: Cannot parse the `--docker-step` flag.");
+                        std::process::exit(ERR_APP);
+                    }
                 }
-                else {
-                    // .expect("Missing the `--docker-step` flag")
-                }
+                else { unreachable!(); }
                 std::process::exit(SUCCESS);
             }
             else {
                 match raw.list_contexts("steps") {
                     Some(steps) => {
                         for (i_step, ctx_step) in steps.iter().enumerate() {
-                            run_step(i_step, ctx_global.overlay(ctx_step)); // TODO config overlay
+                            run_step(i_step, ctx_global.overlay(&ctx_step).overlay(&ctx_args));
                         }
                     }
                     None => {
@@ -157,7 +166,7 @@ fn run_yaml<P: AsRef<Path>>(playbook: P, args: Context) -> Result<(), std::io::E
             }
         },
         Err(e) => {
-            error!("{}", e);
+            error!("{}: {}", e, "Some YAML parsing error has occurred.");
             std::process::exit(ERR_YML);
         }
     }
@@ -187,8 +196,13 @@ fn main() {
         .set_opt("playbook", ctx_args_helper(args.value_of("PLAYBOOK")));
 
     let playbook = Path::new(args.value_of("PLAYBOOK").unwrap());
-    if inside_docker() && playbook.is_absolute() {
-        // Absolute path to the playbook must be self-mounted with relocation specified at cmdline,
+    if let Some(_) = ctx_args.get("docker-step") {
+        if !inside_docker() {
+            error!("Context error: Not inside of a Docker container.");
+            std::process::exit(ERR_APP);
+        }
+
+        // Especially, absolute path to the playbook must be self-mounted with relocation specified at cmdline,
         //   because we cannot read any content of the playbook without locating it first.
         if let Err(e) = run_yaml(Path::new(args.value_of("RELOCATE").expect("Missing the `--relocate` flag"))
             .join(playbook.file_name().unwrap()), ctx_args) {
@@ -197,9 +211,9 @@ fn main() {
             }
     }
     else {
-         if let Err(e) = run_yaml(playbook, ctx_args) {
-                error!("{}: {}", e, playbook.display());
-                std::process::exit(ERR_SYS);
-            }
+        if let Err(e) = run_yaml(playbook, ctx_args) {
+            error!("{}: {}", e, playbook.display());
+            std::process::exit(ERR_SYS);
+        }
     }
 }
