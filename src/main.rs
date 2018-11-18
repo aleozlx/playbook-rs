@@ -85,16 +85,14 @@ fn resolve<'step>(ctx_step: &'step Context, whitelist: &Vec<Context>) -> (Option
         }
         for ctx_source in whitelist {
             if let Some(CtxObj::Str(src)) = ctx_source.get("src") {
+                let ref playbook: String = ctx_step.unpack("playbook").unwrap();
                 let playbook_dir;
-                if let Some(CtxObj::Str(playbook)) = ctx_step.get("playbook") {
-                    if let Some(parent) = Path::new(playbook).parent() {
-                        playbook_dir = parent;
-                    }
-                    else {
-                        playbook_dir = Path::new(".");
-                    }
+                if let Some(parent) = Path::new(playbook).parent() {
+                    playbook_dir = parent;
                 }
-                else { unreachable!(); }
+                else {
+                    playbook_dir = Path::new(".");
+                }
                 let ref src_path = playbook_dir.join(src);
                 let src_path_str = src_path.to_str().unwrap();
                 debug!("Searching \"{}\" for `{}`.", src_path_str, action);
@@ -117,16 +115,8 @@ fn resolve<'step>(ctx_step: &'step Context, whitelist: &Vec<Context>) -> (Option
 }
 
 fn invoke(src: Context, ctx_step: Context) {
-    let action: &str;
-    if let Some(CtxObj::Str(action_unpacked)) = ctx_step.get("action") {
-        action = action_unpacked;
-    }
-    else { unreachable!(); }
-    let src_path: &str;
-    if let Some(CtxObj::Str(src_unpacked)) = src.get("src") {
-        src_path = src_unpacked;
-    }
-    else { unreachable!(); }
+    let ref action: String = ctx_step.unpack("action").unwrap();
+    let ref src_path: String = src.unpack("src").unwrap();
     debug!("ctx({}@{}) =\n{}", action.cyan(), src_path.dimmed(), ctx_step);
 
 }
