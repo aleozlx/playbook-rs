@@ -17,6 +17,12 @@ use colored::*;
 
 use ymlctx::context::{Context, CtxObj};
 
+const SUCCESS: i32 = 0;
+const ERR_SYS: i32 = 1;
+const ERR_APP: i32 = 2;
+const ERR_YML: i32 = 3;
+const ERR_JOB: i32 = 4;
+
 fn setup_logger() -> Result<(), fern::InitError> {
     fern::Dispatch::new()
         .format(|out, message, record| {
@@ -63,9 +69,10 @@ fn sys_shell(ctx: &Yaml) -> ! {
     unimplemented!()
 }
 
-fn run_step(num_step: usize, step: &Context) {
+fn run_step(num_step: usize, step: Context) {
     if let CtxObj::Str(action) = &step["action"] {
         let action: &str = action;
+        println!("{} {}", action, step);
         if action.starts_with("step_") {
             warn!("Action name should not be prefixed by \"step_\": {}", action);
         }
@@ -102,7 +109,7 @@ fn run_step(num_step: usize, step: &Context) {
     }
 }
 
-fn run_yaml<P: AsRef<Path>>(playbook: P, num_step: Option<usize>) -> Result<(), std::io::Error> {
+fn run_yaml<P: AsRef<Path>>(playbook: P, args: Context) -> Result<(), std::io::Error> {
     // TODO propagate relocated path into ctx
     let mut file = File::open(playbook)?;
     let mut contents = String::new();
@@ -110,33 +117,56 @@ fn run_yaml<P: AsRef<Path>>(playbook: P, num_step: Option<usize>) -> Result<(), 
     match YamlLoader::load_from_str(&contents) {
         Ok(config) => {
             let ref config = config[0];
-            let global_context = Context::from(config.to_owned());
-            // let ref whitelist = white_list();
+            let raw = Context::from(config.to_owned());
+            let ctx_global = raw.hide("steps").hide("docker");
+
             if inside_docker() {
-                // let num_step = num_step.unwrap();
-                // // let ref step = config["steps"][num_step];
-                // let step_context = Context::from(&config["steps"][num_step]);
-                // run_step(num_step, step, whitelist);
-                std::process::exit(0);
+                if let Some(i_step_str) = ctx_global.get("docker-step") {
+                    if let CtxObj::Str(i_step_str) = i_step_str {
+                        let i_step: usize = i_step_str.parse().expect("Cannot parse the `--docker-step` flag");
+                        match raw.list_contexts("steps") {
+                            Some(steps) => {
+                                let ref ctx_step = steps[i_step];
+                                run_step(i_step, ctx_global.overlay(ctx_step));
+                            }
+                            None => {
+                                error!("Syntax Error: Key `steps` is not an array.");
+                                std::process::exit(ERR_YML);
+                            }
+                        }
+                    }
+                    else { unreachable!(); }
+                }
+                else {
+                    // .expect("Missing the `--docker-step` flag")
+                }
+                std::process::exit(SUCCESS);
             }
             else {
-                // if let Yaml::Array(steps) = &config["steps"] {
-                //     for (i_step, _step) in steps.iter().enumerate() {
-                //         run_step(i_step, config);
-                //     }
-                // }
-                // else {
-                //     error!("Syntax Error: Key `steps` is not an array.");
-                //     std::process::exit(1);
-                // }
+                match raw.list_contexts("steps") {
+                    Some(steps) => {
+                        for (i_step, ctx_step) in steps.iter().enumerate() {
+                            run_step(i_step, ctx_global.overlay(ctx_step)); // TODO config overlay
+                        }
+                    }
+                    None => {
+                        error!("Syntax Error: Key `steps` is not an array.");
+                        std::process::exit(ERR_YML);
+                    }
+                }
             }
         },
         Err(e) => {
             error!("{}", e);
-            std::process::exit(1);
+            std::process::exit(ERR_YML);
         }
     }
     Ok(())
+}
+
+fn ctx_args_helper(opt: Option<&str>) -> Option<CtxObj> {
+    if let Some(s) = opt { Some(CtxObj::Str(s.to_owned())) }
+    else { None }
 }
 
 fn main() {
@@ -150,26 +180,26 @@ fn main() {
     ).get_matches();
     setup_logger().unwrap();
 
+    let ctx_args = Context::new()
+        .set_opt("docker-step", ctx_args_helper(args.value_of("DOCKER_STEP")))
+        .set_opt("container-name", ctx_args_helper(args.value_of("CONTAINER_NAME")))
+        .set_opt("relocate", ctx_args_helper(args.value_of("RELOCATE")))
+        .set_opt("playbook", ctx_args_helper(args.value_of("PLAYBOOK")));
+
     let playbook = Path::new(args.value_of("PLAYBOOK").unwrap());
-    let ret = if inside_docker() {
-        let num_step: usize = args.value_of("DOCKER_STEP")
-            .expect("Missing the `--docker-step` flag").parse()
-            .expect("Cannot parse the `--docker-step` flag");
-        if playbook.is_absolute() {
-            // Absolute path to the playbook must be self-mounted with relocation specified at cmdline,
-            //   because we cannot read any content of the playbook without locating it first.
-            run_yaml(Path::new(args.value_of("RELOCATE").expect("Missing the `--relocate` flag"))
-                .join(playbook.file_name().unwrap()), Some(num_step))
-        }
-        else {
-            run_yaml(playbook, Some(num_step))
-        }
+    if inside_docker() && playbook.is_absolute() {
+        // Absolute path to the playbook must be self-mounted with relocation specified at cmdline,
+        //   because we cannot read any content of the playbook without locating it first.
+        if let Err(e) = run_yaml(Path::new(args.value_of("RELOCATE").expect("Missing the `--relocate` flag"))
+            .join(playbook.file_name().unwrap()), ctx_args) {
+                error!("{}: {}", e, playbook.display());
+                std::process::exit(ERR_SYS);
+            }
     }
     else {
-        run_yaml(playbook, None)
-    };
-    if let Err(e) = ret {
-        error!("{}: {}", e, playbook.display());
-        std::process::exit(2);
+         if let Err(e) = run_yaml(playbook, ctx_args) {
+                error!("{}: {}", e, playbook.display());
+                std::process::exit(ERR_SYS);
+            }
     }
 }
