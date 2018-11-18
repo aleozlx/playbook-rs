@@ -1,3 +1,5 @@
+#![feature(proc_macro, specialization)]
+
 #[macro_use] extern crate clap;
 #[macro_use] extern crate log;
 extern crate fern;
@@ -5,6 +7,7 @@ extern crate chrono;
 extern crate yaml_rust;
 extern crate linked_hash_map;
 extern crate colored;
+extern crate pyo3;
 
 use std::str;
 use std::path::Path;
@@ -146,42 +149,36 @@ fn run_yaml<P: AsRef<Path>>(playbook: P, num_step: Option<usize>) -> Result<(), 
 extern crate rpds;
 
 fn main() {
-    // let ref a_yml = YamlLoader::load_from_str(include_str!("fixtures/a.yml")).unwrap()[0];
-    let a = Context::from(YamlLoader::load_from_str(include_str!("fixtures/a.yml")).unwrap()[0].clone());
-    println!("{}", &a);
+    let matches = clap_app!(playbook =>
+        (version: crate_version!())
+        (author: crate_authors!())
+        (about: crate_description!())
+        (@arg DOCKER_STEP: --("docker-step") "For Docker use ONLY: run a specific step with docker")
+        (@arg RELOCATE: --relocate "Relocation of the playbook inside docker, required when using abs. path")
+        (@arg PLAYBOOK: +required "YAML playbook")
+    ).get_matches();
+    setup_logger().unwrap();
 
-    
-
-    // let matches = clap_app!(playbook =>
-    //     (version: crate_version!())
-    //     (author: crate_authors!())
-    //     (about: crate_description!())
-    //     (@arg DOCKER_STEP: --("docker-step") "For Docker use ONLY: run a specific step with docker")
-    //     (@arg RELOCATE: --relocate "Relocation of the playbook inside docker, required when using abs. path")
-    //     (@arg PLAYBOOK: +required "YAML playbook")
-    // ).get_matches();
-    // setup_logger().unwrap();
-
-    // let playbook = Path::new(matches.value_of("PLAYBOOK").unwrap());
-    // let ret = if inside_docker() {
-    //     let num_step: usize = matches.value_of("DOCKER_STEP")
-    //         .expect("Missing the `--docker-step` flag").parse()
-    //         .expect("Cannot parse the `--docker-step` flag");
-    //     if playbook.is_absolute() {
-    //         // Absolute path to the playbook must be self-mounted with relocation specified at cmdline,
-    //         //   because we cannot read any content of the playbook without locating it first.
-    //         run_yaml(Path::new(matches.value_of("RELOCATE").expect("Missing the `--relocate` flag"))
-    //             .join(playbook.file_name().unwrap()), Some(num_step))
-    //     }
-    //     else {
-    //         run_yaml(playbook, Some(num_step))
-    //     }
-    // }
-    // else {
-    //     run_yaml(playbook, None)
-    // };
-    // if let Err(e) = ret {
-    //     error!("{}: {}", e, playbook.display());
-    //     std::process::exit(2);
-    // }
+    let playbook = Path::new(matches.value_of("PLAYBOOK").unwrap());
+    let ret = if inside_docker() {
+        let num_step: usize = matches.value_of("DOCKER_STEP")
+            .expect("Missing the `--docker-step` flag").parse()
+            .expect("Cannot parse the `--docker-step` flag");
+        if playbook.is_absolute() {
+            // Absolute path to the playbook must be self-mounted with relocation specified at cmdline,
+            //   because we cannot read any content of the playbook without locating it first.
+            run_yaml(Path::new(matches.value_of("RELOCATE").expect("Missing the `--relocate` flag"))
+                .join(playbook.file_name().unwrap()), Some(num_step))
+        }
+        else {
+            run_yaml(playbook, Some(num_step))
+        }
+    }
+    else {
+        run_yaml(playbook, None)
+    };
+    if let Err(e) = ret {
+        error!("{}: {}", e, playbook.display());
+        std::process::exit(2);
+    }
 }
