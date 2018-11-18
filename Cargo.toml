@@ -3,6 +3,7 @@ name = "playbook"
 version = "1.0.0"
 authors = ["Alex Yang <aleozlx@gmail.com>"]
 description = "YAML driven Docker DevOps"
+license = "MIT"
 
 [dependencies]
 yaml-rust = "0.4"

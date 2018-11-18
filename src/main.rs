@@ -119,7 +119,7 @@ fn run_yaml<P: AsRef<Path>>(playbook: P, num_step: Option<usize>) -> Result<(), 
     match YamlLoader::load_from_str(&contents) {
         Ok(config) => {
             let ref config = config[0];
-            let global_context = Context::from(config);
+            let global_context = Context::from(config.to_owned());
             let ref whitelist = white_list();
             if inside_docker() {
                 let num_step = num_step.unwrap();
