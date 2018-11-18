@@ -1,9 +1,13 @@
+#![feature(proc_macro, specialization)]
+
 #[macro_use] extern crate clap;
 #[macro_use] extern crate log;
 extern crate fern;
 extern crate chrono;
 extern crate yaml_rust;
+extern crate linked_hash_map;
 extern crate colored;
+extern crate pyo3;
 
 use std::hash::Hash;
 use std::str;
@@ -15,8 +19,12 @@ use std::result::Result;
 use yaml_rust::{Yaml, YamlLoader};
 use colored::*;
 
+// #[macro_use]
+// extern crate serde_derive;
+// extern crate serde_yaml;
+
 mod context;
-use context::{Context, ContextValue};
+use context::{Context, CtxObj};
 
 fn setup_logger() -> Result<(), fern::InitError> {
     fern::Dispatch::new()
@@ -65,21 +73,21 @@ fn sys_shell(ctx: &Yaml) -> ! {
 }
 
 fn run_step(num_step: usize, step: &Context, whitelist: &HashSet<String>) {
-    if let ContextValue::StringValue(action) = &step["action"] {
+    if let CtxObj::Str(action) = &step["action"] {
         let action: &str = action;
         if action.starts_with("step_") {
             warn!("Action name should not be prefixed by \"step_\": {}", action);
         }
         if whitelist.contains(action) {
             if !inside_docker() {
-                info!("Step {}: {}",
-                    (num_step+1).to_string().green().bold(),
-                    step["name"].as_str().unwrap());
+                // info!("Step {}: {}",
+                //     (num_step+1).to_string().green().bold(),
+                //     step["name"].as_str().unwrap());
             }
             else {
-                info!("Step {}: {}",
-                    (num_step+1).to_string().green(),
-                    step["name"].as_str().unwrap());
+                // info!("Step {}: {}",
+                //     (num_step+1).to_string().green(),
+                //     step["name"].as_str().unwrap());
             }
         }
         else{
@@ -139,6 +147,8 @@ fn run_yaml<P: AsRef<Path>>(playbook: P, num_step: Option<usize>) -> Result<(), 
     }
     Ok(())
 }
+
+extern crate rpds;
 
 fn main() {
     let args = clap_app!(playbook =>
