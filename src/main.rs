@@ -1,30 +1,21 @@
-#![feature(proc_macro, specialization)]
-
 #[macro_use] extern crate clap;
 #[macro_use] extern crate log;
 extern crate fern;
 extern crate chrono;
 extern crate yaml_rust;
-extern crate linked_hash_map;
+extern crate ymlctx;
 extern crate colored;
 extern crate pyo3;
 
-use std::hash::Hash;
 use std::str;
 use std::path::Path;
 use std::fs::File;
 use std::io::prelude::*;
-use std::collections::{HashMap, HashSet, BTreeMap};
 use std::result::Result;
 use yaml_rust::{Yaml, YamlLoader};
 use colored::*;
 
-// #[macro_use]
-// extern crate serde_derive;
-// extern crate serde_yaml;
-
-mod context;
-use context::{Context, CtxObj};
+use ymlctx::context::{Context, CtxObj};
 
 fn setup_logger() -> Result<(), fern::InitError> {
     fern::Dispatch::new()
@@ -51,16 +42,16 @@ fn inside_docker() -> bool {
     }
 }
 
-/** 
- * Creates a whitelist that is based on enumeration of files and symlinks with x permission.
-*/
-fn white_list() -> HashSet<String> {
-    // let stdout = std::process::Command::new("find").args(&[".", "-perm", "/111", "-type", "f", "-o", "-type", "l"])
-    //     .output().expect("I/O error").stdout;
-    // let output = str::from_utf8(&stdout).unwrap();
-    // output.lines().map(|i| { i.to_owned() }).collect()
-    ["hi"].iter().map(|&i| {String::from(i)}).collect()
-}
+// /** 
+//  * Creates a whitelist that is based on enumeration of files and symlinks with x permission.
+// */
+// fn white_list() -> HashSet<String> {
+//     // let stdout = std::process::Command::new("find").args(&[".", "-perm", "/111", "-type", "f", "-o", "-type", "l"])
+//     //     .output().expect("I/O error").stdout;
+//     // let output = str::from_utf8(&stdout).unwrap();
+//     // output.lines().map(|i| { i.to_owned() }).collect()
+//     ["hi"].iter().map(|&i| {String::from(i)}).collect()
+// }
 
 type BuiltIn = fn(&Yaml) -> !;
 
@@ -72,13 +63,13 @@ fn sys_shell(ctx: &Yaml) -> ! {
     unimplemented!()
 }
 
-fn run_step(num_step: usize, step: &Context, whitelist: &HashSet<String>) {
+fn run_step(num_step: usize, step: &Context) {
     if let CtxObj::Str(action) = &step["action"] {
         let action: &str = action;
         if action.starts_with("step_") {
             warn!("Action name should not be prefixed by \"step_\": {}", action);
         }
-        if whitelist.contains(action) {
+        // if whitelist.contains(action) {
             if !inside_docker() {
                 // info!("Step {}: {}",
                 //     (num_step+1).to_string().green().bold(),
@@ -89,21 +80,21 @@ fn run_step(num_step: usize, step: &Context, whitelist: &HashSet<String>) {
                 //     (num_step+1).to_string().green(),
                 //     step["name"].as_str().unwrap());
             }
-        }
-        else{
-            let whitelist_sys = get_whitelist_sys();
-            if whitelist_sys.contains_key(action) {
-                info!("{}: {}", "Built-in".red().bold(), action);
-                // TODO context deduction https://doc.rust-lang.org/std/iter/trait.Extend.html
-                let run = whitelist_sys[action];
-                let mut ctx = Yaml::from_str("");
-                ctx.
-                run(&ctx);
-            }
-            else {
-                warn!("Action not recognized: {}", action);
-            }
-        }
+        // }
+        // else{
+        //     // let whitelist_sys = get_whitelist_sys();
+        //     // if whitelist_sys.contains_key(action) {
+        //     //     info!("{}: {}", "Built-in".red().bold(), action);
+        //     //     // TODO context deduction https://doc.rust-lang.org/std/iter/trait.Extend.html
+        //     //     let run = whitelist_sys[action];
+        //     //     let mut ctx = Yaml::from_str("");
+        //     //     ctx.
+        //     //     run(&ctx);
+        //     // }
+        //     // else {
+        //     //     warn!("Action not recognized: {}", action);
+        //     // }
+        // }
     }
     else {
         error!("Syntax Error: Key `action` is not a string.");
@@ -120,24 +111,24 @@ fn run_yaml<P: AsRef<Path>>(playbook: P, num_step: Option<usize>) -> Result<(), 
         Ok(config) => {
             let ref config = config[0];
             let global_context = Context::from(config.to_owned());
-            let ref whitelist = white_list();
+            // let ref whitelist = white_list();
             if inside_docker() {
-                let num_step = num_step.unwrap();
-                // let ref step = config["steps"][num_step];
-                let step_context = Context::from(&config["steps"][num_step]);
-                run_step(num_step, step, whitelist);
+                // let num_step = num_step.unwrap();
+                // // let ref step = config["steps"][num_step];
+                // let step_context = Context::from(&config["steps"][num_step]);
+                // run_step(num_step, step, whitelist);
                 std::process::exit(0);
             }
             else {
-                if let Yaml::Array(steps) = &config["steps"] {
-                    for (i_step, _step) in steps.iter().enumerate() {
-                        run_step(i_step, config);
-                    }
-                }
-                else {
-                    error!("Syntax Error: Key `steps` is not an array.");
-                    std::process::exit(1);
-                }
+                // if let Yaml::Array(steps) = &config["steps"] {
+                //     for (i_step, _step) in steps.iter().enumerate() {
+                //         run_step(i_step, config);
+                //     }
+                // }
+                // else {
+                //     error!("Syntax Error: Key `steps` is not an array.");
+                //     std::process::exit(1);
+                // }
             }
         },
         Err(e) => {
@@ -147,8 +138,6 @@ fn run_yaml<P: AsRef<Path>>(playbook: P, num_step: Option<usize>) -> Result<(), 
     }
     Ok(())
 }
-
-extern crate rpds;
 
 fn main() {
     let args = clap_app!(playbook =>
