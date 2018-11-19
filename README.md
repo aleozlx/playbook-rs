@@ -1,4 +1,4 @@
-# playbook-rs v0.1.5
+# playbook-rs
 YAML driven Docker DevOps
 
 ## Requirements
@@ -8,7 +8,6 @@ YAML driven Docker DevOps
 
 ## Installation
 
-Run the following with 
 ```sh
 cargo +nightly install playbook
 ```
