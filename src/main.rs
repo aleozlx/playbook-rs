@@ -51,14 +51,45 @@ fn inside_docker() -> bool {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct JobError {}
+
 type BuiltIn = fn(&Context) -> !;
+type JobSpawner = fn(src: Context, ctx_step: Context) -> Result<(), JobError>;
 
 fn sys_exit(ctx: &Context) -> ! {
-    std::process::exit(0);
+    std::process::exit(if let Ok(exit_code) = ctx.unpack("exit_code") { exit_code } else { 0 });
 }
 
-fn sys_shell(ctx: &Context) -> ! {
+fn sys_shell(_ctx: &Context) -> ! {
     unimplemented!()
+}
+
+mod spawner;
+fn invoke(src: Context, ctx_step: Context) {
+    let ref action: String = ctx_step.unpack("action").unwrap();
+    let ref src_path_str: String = src.unpack("src").unwrap();
+    debug!("ctx({}@{}) =\n{}", action.cyan(), src_path_str.dimmed(), ctx_step);
+    let src_path = Path::new(src_path_str);
+    if let Some(ext_os) = src_path.extension() {
+        let ext = ext_os.to_str().unwrap();
+        let wrapper = |whichever: JobSpawner| {
+            println!("{}", "== Output =======================".blue());
+            if let Err(_) = whichever(src, ctx_step) {
+                error!("Crash: A task internal error has occurred.");
+                std::process::exit(ERR_JOB);
+            }
+            println!("{}", "== EOF ==========================".blue());
+        };
+        match ext {
+            "py" => wrapper(spawner::invoke_py),
+            _ => warn!("It is not clear how to run {}.", src_path_str)
+        }
+    }
+    else {
+        // Possibly a binary?
+        unimplemented!();
+    }
 }
 
 fn symbols<P: AsRef<Path>>(src: P) -> Result<HashSet<String>, std::io::Error> {
@@ -80,9 +111,9 @@ fn resolve<'step>(ctx_step: &'step Context, whitelist: &Vec<Context>) -> (Option
     else { return (None, None); }
     if let CtxObj::Str(action) = key_action {
         let action: &'step str = action;
-        if action.starts_with("step_") {
-            warn!("Action name should not be prefixed by \"step_\": {}", action.cyan());
-        }
+        // if action.starts_with("step_") {
+        //     warn!("Action name should not be prefixed by \"step_\": {}", action.cyan());
+        // }
         for ctx_source in whitelist {
             if let Some(CtxObj::Str(src)) = ctx_source.get("src") {
                 let ref playbook: String = ctx_step.unpack("playbook").unwrap();
@@ -114,17 +145,10 @@ fn resolve<'step>(ctx_step: &'step Context, whitelist: &Vec<Context>) -> (Option
     }
 }
 
-fn invoke(src: Context, ctx_step: Context) {
-    let ref action: String = ctx_step.unpack("action").unwrap();
-    let ref src_path: String = src.unpack("src").unwrap();
-    debug!("ctx({}@{}) =\n{}", action.cyan(), src_path.dimmed(), ctx_step);
-
-}
-
 fn run_step(ctx_step: Context) {
     if let Some(whitelist) = ctx_step.list_contexts("whitelist") {
         match resolve(&ctx_step, &whitelist) {
-            (Some(action), Some(ctx_source)) => {
+            (_, Some(ctx_source)) => {
                 let i_step: usize = ctx_step.unpack("i_step").unwrap();
                 let show_step = |for_real: bool| {
                     let step_header = format!("Step {}", i_step+1).cyan();
@@ -160,12 +184,11 @@ fn run_step(ctx_step: Context) {
                 }
                 error!("Action not recognized: {}", action);
                 std::process::exit(ERR_YML);
-            }
+            },
             (None, None) => {
                 error!("Syntax Error: Key `action` must be a string.");
                 std::process::exit(ERR_YML);
             }
-            (None, Some(_)) => unreachable!()
         }
     }
     else {

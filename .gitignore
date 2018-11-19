@@ -1,3 +1,5 @@
 /target
 **/*.rs.bk
 bin_test/
+*.pyc
+__pycache__/
