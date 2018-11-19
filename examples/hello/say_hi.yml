@@ -6,9 +6,8 @@ steps:
 - name: Running in a container
   action: say_hi
   docker:
-    image: playbook-hello
+    image: aleozlx/playbook-hello
     docker_overrides:
       whoami: Container
 - name: Running on host
   action: say_hi
-- action: sys_exit
