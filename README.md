@@ -6,6 +6,13 @@ YAML driven Docker DevOps
 * Python3.x
 * (Optional) nvidia-docker2 (Make sure you can `nvidia-smi` and `docker images`)
 
+## Installation
+
+Run the following with 
+```sh
+cargo +nightly install playbook
+```
+
 ## Usage example
 
 ```sh
