@@ -312,7 +312,6 @@ fn run_yaml<P: AsRef<Path>>(playbook: P, ctx_args: Context) -> Result<(), std::i
     let enter_global = |yml_global: &Yaml| {
         let raw = Context::from(yml_global.to_owned());
         let ctx_global = raw.hide("steps");
-        println!("{}", &ctx_global);
         if let Some(steps) = raw.list_contexts("steps") {
             enter_steps(steps, ctx_global);
         }

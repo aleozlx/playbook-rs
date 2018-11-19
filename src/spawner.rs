@@ -54,6 +54,10 @@ fn copy_user_info(facts: &mut HashMap<String, String>, user: &str) {
     }
 }
 
+pub fn format_cmd(cmd: &Vec<String>) -> String {
+    cmd.iter().map(|s| { if s.contains(" ") { format!("\"{}\"", s) } else { s.to_owned() } }).collect::<Vec<String>>().join(" ")
+}
+
 pub fn docker_start<I, S>(ctx_docker: Context, cmd: I) -> Result<(), JobError>
   where I: IntoIterator<Item = S>, S: AsRef<OsStr>
 {
@@ -121,7 +125,7 @@ pub fn docker_start<I, S>(ctx_docker: Context, cmd: I) -> Result<(), JobError>
     }
     else { return Err(JobError {}); }
     docker_run.extend::<Vec<String>>(cmd.into_iter().map(|s| {s.as_ref().to_str().unwrap().to_owned()}).collect());
-    info!("{:?}", &docker_run);
+    info!("{}", format_cmd(&docker_run));
     let docker_linux: Vec<CString> = docker_run.iter().map(|s| {CString::new(s as &str).unwrap()}).collect();
     match fork() {
         Ok(ForkResult::Child) => {
