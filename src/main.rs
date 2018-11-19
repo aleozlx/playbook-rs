@@ -55,14 +55,14 @@ fn inside_docker() -> bool {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct JobError {}
 
-type BuiltIn = fn(&Context) -> !;
+type BuiltIn = fn(Context) -> !;
 type JobSpawner = fn(src: Context, ctx_step: Context) -> Result<(), JobError>;
 
-fn sys_exit(ctx: &Context) -> ! {
+fn sys_exit(ctx: Context) -> ! {
     std::process::exit(if let Ok(exit_code) = ctx.unpack("exit_code") { exit_code } else { 0 });
 }
 
-fn sys_shell(ctx: &Context) -> ! {
+fn sys_shell(ctx: Context) -> ! {
     if let Some(ctx_docker) = ctx.subcontext("docker") {
         warn!("{}", "Just a bash shell. Here goes nothing.".purple());
         match spawner::docker_start(ctx_docker.set("interactive", CtxObj::Bool(true)), &["bash"]) {
@@ -232,11 +232,12 @@ fn run_step(ctx_step: Context) {
             (Some(action), None) => {
                 match resolve_builtin(&ctx_step) {
                     (_, Some(sys_func)) => {
+                        let ctx_sys = ctx_step.hide("whitelist").hide("i_step");
                         info!("{}: {}", "Built-in".magenta(), action);
                         eprintln!("{}", "== Context ======================".cyan());
-                        eprintln!("# ctx({}) =\n{}", action.cyan(), ctx_step);
+                        eprintln!("# ctx({}) =\n{}", action.cyan(), ctx_sys);
                         eprintln!("{}", "== EOF ==========================".cyan());
-                        sys_func(&ctx_step);
+                        sys_func(ctx_sys);
                     },
                     (Some(_), None) => {
                         error!("Action not recognized: {}", action);
@@ -254,11 +255,12 @@ fn run_step(ctx_step: Context) {
     else {
         match resolve_builtin(&ctx_step) {
             (Some(action), Some(sys_func)) => {
+                let ctx_sys = ctx_step.hide("whitelist").hide("i_step");
                 info!("{}: {}", "Built-in".magenta(), action);
                 eprintln!("{}", "== Context ======================".cyan());
-                eprintln!("# ctx({}) =\n{}", action.cyan(), ctx_step);
+                eprintln!("# ctx({}) =\n{}", action.cyan(), ctx_sys);
                 eprintln!("{}", "== EOF ==========================".cyan());
-                sys_func(&ctx_step);
+                sys_func(ctx_sys);
             },
             (Some(action), None) => {
                 error!("Action not recognized: {}", action);
@@ -310,6 +312,7 @@ fn run_yaml<P: AsRef<Path>>(playbook: P, ctx_args: Context) -> Result<(), std::i
     let enter_global = |yml_global: &Yaml| {
         let raw = Context::from(yml_global.to_owned());
         let ctx_global = raw.hide("steps");
+        println!("{}", &ctx_global);
         if let Some(steps) = raw.list_contexts("steps") {
             enter_steps(steps, ctx_global);
         }
@@ -319,7 +322,13 @@ fn run_yaml<P: AsRef<Path>>(playbook: P, ctx_args: Context) -> Result<(), std::i
         }
     };
 
-    let mut file = File::open(playbook)?;
+    let fname = playbook.as_ref();
+    if let Some(playbook_ext) = fname.extension() {
+        if playbook_ext != "yml" && playbook_ext != "yaml" {
+            warn!("{}", "The playbook file is not YAML based on its extension.".yellow());
+        }
+    }
+    let mut file = File::open(fname)?;
     let mut contents = String::new();
     file.read_to_string(&mut contents)?;
     
