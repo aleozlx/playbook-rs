@@ -162,8 +162,7 @@ fn run_step(ctx_step: Context) {
                 };
                 if let Some(CtxObj::Str(_)) = ctx_step.get("docker-step") {
                     show_step(true);
-                    debug!("About to run this inside a container.");
-                    // invoke(ctx_source, ctx_step.hide("whitelist").hide("i_step"));
+                    invoke(ctx_source, ctx_step.hide("whitelist").hide("i_step"));
                 }
                 else {
                     if let Some(ctx_docker) = ctx_step.subcontext("docker") {
