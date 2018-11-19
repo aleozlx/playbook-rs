@@ -27,7 +27,7 @@ const ERR_APP: i32 = 2;
 const ERR_YML: i32 = 3;
 const ERR_JOB: i32 = 4;
 
-fn setup_logger() -> Result<(), fern::InitError> {
+fn setup_logger(verbose: bool) -> Result<(), fern::InitError> {
     fern::Dispatch::new()
         .format(|out, message, record| {
             out.finish(format_args!(
@@ -37,7 +37,7 @@ fn setup_logger() -> Result<(), fern::InitError> {
                 message
             ))
         })
-        .level(log::LevelFilter::Debug)
+        .level(if verbose {log::LevelFilter::Debug} else {log::LevelFilter::Info})
         .chain(std::io::stderr())
         .apply()?;
     Ok(())
@@ -85,7 +85,9 @@ mod spawner;
 fn invoke(src: Context, ctx_step: Context) {
     let ref action: String = ctx_step.unpack("action").unwrap();
     let ref src_path_str: String = src.unpack("src").unwrap();
-    debug!("ctx({}@{}) =\n{}", action.cyan(), src_path_str.dimmed(), ctx_step);
+    eprintln!("{}", "== Context ======================".cyan());
+    eprintln!("# ctx({}@{}) =\n{}", action.cyan(), src_path_str.dimmed(), ctx_step);
+    eprintln!("{}", "== EOF ==========================".cyan());
     let src_path = Path::new(src_path_str);
     if let Some(ext_os) = src_path.extension() {
         let ext = ext_os.to_str().unwrap();
@@ -161,6 +163,18 @@ fn resolve<'step>(ctx_step: &'step Context, whitelist: &Vec<Context>) -> (Option
     }
 }
 
+fn resolve_builtin<'step>(ctx_step: &'step Context) -> (Option<&'step str>, Option<BuiltIn>) {
+    if let Some(CtxObj::Str(action)) = ctx_step.get("action") {
+        let action: &'step str = action;
+        match action {
+            "sys_exit" => (Some(action), Some(sys_exit)),
+            "sys_shell" => (Some(action), Some(sys_shell)),
+            _ => (Some(action), None)
+        }
+    }
+    else { (None, None) }
+}
+
 fn run_step(ctx_step: Context) {
     if let Some(whitelist) = ctx_step.list_contexts("whitelist") {
         match resolve(&ctx_step, &whitelist) {
@@ -194,6 +208,12 @@ fn run_step(ctx_step: Context) {
                             if let Ok(relocate) = relocate_unpack {
                                 resume_params.push(relocate);
                             }
+                            let verbose_unpack = ctx_step.unpack::<i64>("verbose-fern");
+                            if let Ok(verbose) = verbose_unpack {
+                                if verbose > 0 {
+                                    resume_params.push(String::from("-v"));
+                                }
+                            }
                             match spawner::docker_start(ctx_docker.clone(), resume_params) {
                                 Ok(()) => {},
                                 Err(_) => {
@@ -210,17 +230,20 @@ fn run_step(ctx_step: Context) {
                 }
             },
             (Some(action), None) => {
-                let sys_action_wrapper = |whichever: BuiltIn| {
-                    info!("{}: {}", "Built-in".magenta(), action);
-                    whichever(&ctx_step);
-                };
-                match action {
-                    "sys_exit" => sys_action_wrapper(sys_exit),
-                    "sys_shell" => sys_action_wrapper(sys_shell),
-                    _ => ()
+                match resolve_builtin(&ctx_step) {
+                    (_, Some(sys_func)) => {
+                        info!("{}: {}", "Built-in".magenta(), action);
+                        eprintln!("{}", "== Context ======================".cyan());
+                        eprintln!("# ctx({}) =\n{}", action.cyan(), ctx_step);
+                        eprintln!("{}", "== EOF ==========================".cyan());
+                        sys_func(&ctx_step);
+                    },
+                    (Some(_), None) => {
+                        error!("Action not recognized: {}", action);
+                        std::process::exit(ERR_YML);
+                    },
+                    (None, None) => unreachable!()
                 }
-                error!("Action not recognized: {}", action);
-                std::process::exit(ERR_YML);
             },
             (None, None) => {
                 error!("Syntax Error: Key `action` must be a string.");
@@ -229,8 +252,23 @@ fn run_step(ctx_step: Context) {
         }
     }
     else {
-        error!("Syntax Error: Key `whitelist` should be a list of mappings.");
-        std::process::exit(ERR_YML);
+        match resolve_builtin(&ctx_step) {
+            (Some(action), Some(sys_func)) => {
+                info!("{}: {}", "Built-in".magenta(), action);
+                eprintln!("{}", "== Context ======================".cyan());
+                eprintln!("# ctx({}) =\n{}", action.cyan(), ctx_step);
+                eprintln!("{}", "== EOF ==========================".cyan());
+                sys_func(&ctx_step);
+            },
+            (Some(action), None) => {
+                error!("Action not recognized: {}", action);
+                std::process::exit(ERR_YML);
+            },
+            (None, _) => {
+                error!("Syntax Error: Key `whitelist` should be a list of mappings.");
+                std::process::exit(ERR_YML);
+            }
+        }
     }    
 }
 
@@ -271,7 +309,7 @@ fn run_yaml<P: AsRef<Path>>(playbook: P, ctx_args: Context) -> Result<(), std::i
 
     let enter_global = |yml_global: &Yaml| {
         let raw = Context::from(yml_global.to_owned());
-        let ctx_global = raw.hide("steps").hide("docker");
+        let ctx_global = raw.hide("steps");
         if let Some(steps) = raw.list_contexts("steps") {
             enter_steps(steps, ctx_global);
         }
@@ -302,9 +340,13 @@ fn main() {
         (about: crate_description!())
         (@arg DOCKER_STEP: --("docker-step") +takes_value "For playbook-rs use ONLY: indicator that we have entered a container")
         (@arg RELOCATE: --relocate +takes_value "Relocation of the playbook inside docker, required when using abs. path")
+        (@arg VERBOSE: --verbose -v "Debug log")
         (@arg PLAYBOOK: +required "YAML playbook")
     ).get_matches();
-    setup_logger().unwrap();
+    match args.occurrences_of("VERBOSE") {
+        0 => setup_logger(false),
+        _ => setup_logger(true)
+    }.unwrap();
     fn _helper(opt: Option<&str>) -> Option<CtxObj> {
         if let Some(s) = opt { Some(CtxObj::Str(s.to_owned())) }
         else { None }
@@ -313,7 +355,11 @@ fn main() {
         .set_opt("docker-step", _helper(args.value_of("DOCKER_STEP")))
         // .set_opt("container-name", _helper(args.value_of("CONTAINER_NAME")))
         .set_opt("relocate", _helper(args.value_of("RELOCATE")))
-        .set_opt("playbook", _helper(args.value_of("PLAYBOOK")));
+        .set_opt("playbook", _helper(args.value_of("PLAYBOOK")))
+        .set_opt("verbose-fern", match args.occurrences_of("VERBOSE") {
+            0 => None,
+            v => Some(CtxObj::Int(v as i64))
+        });
     let mut playbook = Path::new(args.value_of("PLAYBOOK").unwrap()).to_path_buf();
     if let Some(_) = ctx_args.get("docker-step") {
         if !inside_docker() {

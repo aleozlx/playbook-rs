@@ -1,0 +1,5 @@
+---
+docker:
+  image: playbook-hello
+steps:
+- action: sys_shell
