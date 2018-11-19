@@ -62,8 +62,23 @@ fn sys_exit(ctx: &Context) -> ! {
     std::process::exit(if let Ok(exit_code) = ctx.unpack("exit_code") { exit_code } else { 0 });
 }
 
-fn sys_shell(_ctx: &Context) -> ! {
-    unimplemented!()
+fn sys_shell(ctx: &Context) -> ! {
+    if let Some(ctx_docker) = ctx.subcontext("docker") {
+        warn!("{}", "Just a bash shell. Here goes nothing.".purple());
+        match spawner::docker_start(ctx_docker.set("interactive", CtxObj::Bool(true)), &["bash"]) {
+            Ok(()) => {
+                std::process::exit(SUCCESS);
+            },
+            Err(_) => {
+                error!("Docker crashed.");
+                std::process::exit(ERR_YML);
+            }
+        }
+    }
+    else {
+        error!("Docker context not found!");
+        std::process::exit(ERR_YML);
+    }
 }
 
 mod spawner;
@@ -180,8 +195,11 @@ fn run_step(ctx_step: Context) {
                                 resume_params.push(relocate);
                             }
                             match spawner::docker_start(ctx_docker.clone(), resume_params) {
-                                Ok(()) => {}, // TODO handle errors etc
-                                Err(_) => {}
+                                Ok(()) => {},
+                                Err(_) => {
+                                    error!("{}", "Container has crashed".red().bold());
+                                    std::process::exit(ERR_JOB);
+                                }
                             }
                         }
                     }
