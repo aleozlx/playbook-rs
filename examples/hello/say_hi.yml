@@ -6,7 +6,7 @@ steps:
 - name: Running in a container
   action: say_hi
   docker:
-    image: frolvlad/alpine-python3
+    image: ubuntu:18.04
     docker_overrides:
       whoami: Container
 - name: Running on host

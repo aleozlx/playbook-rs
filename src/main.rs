@@ -7,6 +7,7 @@ extern crate ymlctx;
 extern crate colored;
 extern crate pyo3;
 extern crate regex;
+extern crate nix;
 
 use std::str;
 use std::path::Path;
@@ -161,10 +162,28 @@ fn run_step(ctx_step: Context) {
                 };
                 if let Some(CtxObj::Str(_)) = ctx_step.get("docker-step") {
                     show_step(true);
+                    debug!("About to run this inside a container.");
+                    // invoke(ctx_source, ctx_step.hide("whitelist").hide("i_step"));
                 }
                 else {
                     if let Some(ctx_docker) = ctx_step.subcontext("docker") {
                         show_step(false);
+                        if let Some(CtxObj::Str(image_name)) = ctx_docker.get("image") {
+                            info!("Entering Docker: {}", image_name.purple());
+                            let mut resume_params = vec! [
+                                String::from("playbook"),
+                                format!("--docker-step={}", i_step),
+                                ctx_step.unpack("playbook").unwrap()
+                            ];
+                            let relocate_unpack = ctx_step.unpack::<String>("relocate");
+                            if let Ok(relocate) = relocate_unpack {
+                                resume_params.push(relocate);
+                            }
+                            match spawner::docker_start(ctx_docker.clone(), resume_params) {
+                                Ok(()) => {}, // TODO handle errors etc
+                                Err(_) => {}
+                            }
+                        }
                     }
                     else {
                         show_step(true);
@@ -286,6 +305,7 @@ fn main() {
         //   because we cannot read any content of the playbook without locating it first.
         playbook = Path::new(args.value_of("RELOCATE").expect("Missing the `--relocate` flag")).join(playbook.file_name().unwrap());
     }
+    println!(">>> {:?}", &playbook);
     match run_yaml(&playbook, ctx_args) {
         Ok(()) => (),
         Err(e) => {
