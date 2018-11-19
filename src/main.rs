@@ -171,6 +171,7 @@ fn run_step(ctx_step: Context) {
                         if let Some(CtxObj::Str(image_name)) = ctx_docker.get("image") {
                             info!("Entering Docker: {}", image_name.purple());
                             let mut resume_params = vec! [
+                                String::from("/usr/bin/env"),
                                 String::from("playbook"),
                                 format!("--docker-step={}", i_step),
                                 ctx_step.unpack("playbook").unwrap()
@@ -218,6 +219,7 @@ fn run_step(ctx_step: Context) {
 
 fn run_yaml<P: AsRef<Path>>(playbook: P, ctx_args: Context) -> Result<(), std::io::Error> {
     let enter_partial = |ctx_partial: Context| {
+        debug!("ctx({}) =\n{}", "partial".dimmed(), ctx_partial);
         if let Some(CtxObj::Str(_)) = ctx_partial.get("docker-step") {
             run_step(
                 if let Some(ctx_docker) = ctx_partial.subcontext("docker").unwrap().subcontext("docker_overrides") {
@@ -305,7 +307,6 @@ fn main() {
         //   because we cannot read any content of the playbook without locating it first.
         playbook = Path::new(args.value_of("RELOCATE").expect("Missing the `--relocate` flag")).join(playbook.file_name().unwrap());
     }
-    println!(">>> {:?}", &playbook);
     match run_yaml(&playbook, ctx_args) {
         Ok(()) => (),
         Err(e) => {

@@ -6,9 +6,9 @@ steps:
 - name: Running in a container
   action: say_hi
   docker:
-    image: ubuntu:18.04
+    image: playbook-hello
     docker_overrides:
       whoami: Container
-- name: Running on host
-  action: say_hi
+# - name: Running on host
+#   action: say_hi
 - action: sys_exit
