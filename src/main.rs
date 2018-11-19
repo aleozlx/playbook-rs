@@ -283,8 +283,8 @@ fn main() {
         (version: crate_version!())
         (author: crate_authors!())
         (about: crate_description!())
-        (@arg DOCKER_STEP: --("docker-step") "For playbook-rs use ONLY: indicator that we have entered a container")
-        (@arg RELOCATE: --relocate "Relocation of the playbook inside docker, required when using abs. path")
+        (@arg DOCKER_STEP: --("docker-step") +takes_value "For playbook-rs use ONLY: indicator that we have entered a container")
+        (@arg RELOCATE: --relocate +takes_value "Relocation of the playbook inside docker, required when using abs. path")
         (@arg PLAYBOOK: +required "YAML playbook")
     ).get_matches();
     setup_logger().unwrap();
