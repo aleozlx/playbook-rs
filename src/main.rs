@@ -305,7 +305,9 @@ fn main() {
         }
         // Especially, absolute path to the playbook must be self-mounted with relocation specified at cmdline,
         //   because we cannot read any content of the playbook without locating it first.
-        playbook = Path::new(args.value_of("RELOCATE").expect("Missing the `--relocate` flag")).join(playbook.file_name().unwrap());
+        if let Some(relocate) = args.value_of("RELOCATE") {
+            playbook = Path::new(relocate).join(playbook.file_name().unwrap());
+        }
     }
     match run_yaml(&playbook, ctx_args) {
         Ok(()) => (),
