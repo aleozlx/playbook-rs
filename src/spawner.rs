@@ -65,7 +65,9 @@ pub fn docker_start<I, S>(ctx_docker: Context, cmd: I) -> Result<(), JobError>
 {
     let username;
     let output = std::process::Command::new("id").output().unwrap();
-    let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+    let mut stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+    let newline_len = stdout.trim_right().len();
+    stdout.truncate(newline_len);
     let rule = Regex::new(r"^uid=(?P<uid>[0-9]+)(\((?P<user>\w+)\))? gid=(?P<gid>[0-9]+)(\((?P<group>\w+)\))?").unwrap();
     if let Some(caps) = rule.captures(&stdout) {
         username = caps.name("user").unwrap().as_str().to_owned();
@@ -78,10 +80,11 @@ pub fn docker_start<I, S>(ctx_docker: Context, cmd: I) -> Result<(), JobError>
     // docker_run.push(String::from("-v"));
     // docker_run.push(format!("{}:/usr/bin/playbook", std::env::current_exe().unwrap().to_str().unwrap()));
     docker_run.push(String::from("-v"));
-    docker_run.push(format!("{}:{}/current-ro", std::env::current_dir().unwrap().to_str().unwrap(), &home));
+    docker_run.push(format!("{}:{}/current-ro:ro", std::env::current_dir().unwrap().to_str().unwrap(), &home));
     docker_run.push(String::from("-w"));
     docker_run.push(format!("{}/current-ro", &home));
-    // docker_run.push(format!("--user={}", username)); // TODO add gid
+    docker_run.push(String::from("-e"));
+    docker_run.push(format!("TKSTACK_USER={}", &stdout));
     if let Some(CtxObj::Str(runtime)) = ctx_docker.get("runtime") {
         docker_run.push(format!("--runtime={}", runtime));
     }
@@ -95,9 +98,10 @@ pub fn docker_start<I, S>(ctx_docker: Context, cmd: I) -> Result<(), JobError>
             if let CtxObj::Str(vol) = v {
                 if let Some(i) = vol.find(":") {
                     let (src, dst) = vol.split_at(i);
+                    let suffix = if dst.ends_with(":ro") || dst.ends_with(":rw") || dst.ends_with(":z") || dst.ends_with(":Z") { "" } else { ":ro" };
                     if let Ok(src) = Path::new(src).canonicalize() {
                         docker_run.push(String::from("-v"));
-                        docker_run.push(format!("{}:{}", src.to_str().unwrap(), dst));
+                        docker_run.push(format!("{}:{}{}", src.to_str().unwrap(), dst, suffix));
                     }
                 }
             }
@@ -117,6 +121,14 @@ pub fn docker_start<I, S>(ctx_docker: Context, cmd: I) -> Result<(), JobError>
                 "-e", "DISPLAY", "-v", "/tmp/.X11-unix:/tmp/.X11-unix:rw",
                 "-v", &format!("{}/.Xauthority:{}/.Xauthority:ro", userinfo["home_dir"], home), 
             ].iter().map(|&s| {s.to_owned()}).collect());
+        }
+    }
+    if let Some(CtxObj::Array(envs)) = ctx_docker.get("environment") {
+        for v in envs {
+            if let CtxObj::Str(var) = v {
+                docker_run.push(String::from("-e"));
+                docker_run.push(var.to_owned());
+            }
         }
     }
     if let Some(CtxObj::Str(container_name)) = ctx_docker.get("container_name") {
