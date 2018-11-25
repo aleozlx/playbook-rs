@@ -1,0 +1,12 @@
+---
+whitelist:
+- src: say_hi.py
+whoami: Host
+steps:
+- name: Running in a container
+  action: say_hi
+  docker:
+    image: aleozlx/playbook-hello
+    docker_overrides:
+      whoami: Container
+
