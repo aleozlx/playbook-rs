@@ -64,14 +64,33 @@ fn sys_exit(ctx: Context) -> ! {
 
 fn sys_shell(ctx: Context) -> ! {
     if let Some(ctx_docker) = ctx.subcontext("docker") {
-        warn!("{}", "Just a bash shell. Here goes nothing.".purple());
-        match spawner::docker_start(ctx_docker.set("interactive", CtxObj::Bool(true)), &["bash"]) {
-            Ok(()) => {
-                std::process::exit(SUCCESS);
-            },
-            Err(_) => {
-                error!("Docker crashed.");
-                std::process::exit(ERR_YML);
+        if let Some(CtxObj::Array(bash_cmd)) = ctx.get("bash") {
+            let cmd = spawner::format_cmd(bash_cmd.iter().map(|arg| {
+                match arg {
+                    CtxObj::Str(s) => s.to_owned(),
+                    _ => String::from("")
+                }
+            }));
+            match spawner::docker_start(ctx_docker, &["bash", "-c", &cmd]) {
+                Ok(()) => {
+                    std::process::exit(SUCCESS);
+                },
+                Err(_) => {
+                    error!("Docker crashed.");
+                    std::process::exit(ERR_YML);
+                }
+            }
+        }
+        else {
+            warn!("{}", "Just a bash shell. Here goes nothing.".purple());
+            match spawner::docker_start(ctx_docker.set("interactive", CtxObj::Bool(true)), &["bash"]) {
+                Ok(()) => {
+                    std::process::exit(SUCCESS);
+                },
+                Err(_) => {
+                    error!("Docker crashed.");
+                    std::process::exit(ERR_YML);
+                }
             }
         }
     }

@@ -1,5 +1,5 @@
 ---
 docker:
-  image: aleozlx/playbook-hello
+  image: aleozlx/playbook-tensorflow
 steps:
 - action: sys_shell

@@ -1,4 +1,4 @@
 From rustlang/rust:nightly-slim
 RUN apt -y update && apt -y install python3 python3-dev
 RUN ln -sf /usr/bin/python3 /usr/bin/python
-RUN cargo install playbook #v0.1.5
+RUN cargo install --version 0.2.2 playbook

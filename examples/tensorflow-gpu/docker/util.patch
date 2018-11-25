@@ -1,0 +1,11 @@
+--- /usr/lib/python3.5/importlib/util.py	2017-11-28 16:50:47.000000000 +0000
++++ /tmp/util.py	2018-09-27 04:23:59.859688930 +0000
+@@ -241,7 +241,7 @@
+             if id(self) != id(sys.modules[original_name]):
+                 msg = ('module object for {!r} substituted in sys.modules '
+                        'during a lazy load')
+-            raise ValueError(msg.format(original_name))
++                raise ValueError(msg.format(original_name))
+         # Update after loading since that's what would happen in an eager
+         # loading situation.
+         self.__dict__.update(attrs_updated)

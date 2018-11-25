@@ -1,0 +1,8 @@
+---
+docker:
+  image: aleozlx/playbook-tensorflow
+  runtime: nvidia
+whitelist:
+- src: nvidia-status.py
+steps:
+- action: nvidia_status

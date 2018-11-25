@@ -1,9 +1,10 @@
 [package]
 name = "playbook"
-version = "0.1.5"
+version = "0.2.2"
 authors = ["Alex Yang <aleozlx@gmail.com>"]
 description = "YAML driven Docker DevOps"
 license = "Apache-2.0 OR MIT"
+readme = "README.md"
 
 [dependencies]
 yaml-rust = "^0.4"
