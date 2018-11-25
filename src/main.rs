@@ -5,9 +5,11 @@ extern crate chrono;
 extern crate yaml_rust;
 extern crate ymlctx;
 extern crate colored;
-extern crate pyo3;
 extern crate regex;
 extern crate nix;
+
+#[cfg(feature = "spawner_python")]
+extern crate pyo3;
 
 use std::str;
 use std::path::Path;
@@ -119,6 +121,7 @@ fn invoke(src: Context, ctx_step: Context) {
             println!("{}", "== EOF ==========================".blue());
         };
         match ext {
+            #[cfg(feature = "spawner_python")]
             "py" => wrapper(spawner::invoke_py),
             _ => warn!("It is not clear how to run {}.", src_path_str)
         }

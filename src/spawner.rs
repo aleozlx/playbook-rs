@@ -3,13 +3,17 @@ use std::result::Result;
 use std::ffi::{CString, OsStr};
 use std::collections::HashMap;
 use ymlctx::context::{Context, CtxObj};
-use pyo3::prelude::*;
-use pyo3::types::PyList;
 use regex::Regex;
 use nix::unistd::{fork, execvp, ForkResult};
 use nix::sys::wait::{waitpid, WaitStatus};
 use crate::JobError;
 
+#[cfg(feature = "spawner_python")]
+use pyo3::prelude::*;
+#[cfg(feature = "spawner_python")]
+use pyo3::types::PyList;
+
+#[cfg(feature = "spawner_python")]
 pub fn invoke_py(src: Context, ctx_step: Context) -> Result<(), JobError> {
     let gil = Python::acquire_gil();
     let py = gil.python();
