@@ -11,4 +11,3 @@ steps:
       whoami: Container
 - name: Running on host
   action: say_hi
-- action: sys_exit
