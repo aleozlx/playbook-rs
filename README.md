@@ -101,11 +101,11 @@ Host: Hi!
 
 ## How to add steps?
 
-1. Add a function `def something(ctx)`. Current execution context is in `ctx` as dict. **TODO** ~~Keys are proxied to attributes to save a lot of brackets and quotes.~~
+1. Add a function `def something(ctx)`. Current execution context is in `ctx` as dict. Keys are proxied to attributes to save a lot of brackets and quotes.
 
 ```python
 def something(ctx):
-    print(ctx['my_var'])
+    print(ctx.my_var)
 ```
 
 2. Whitelist your step function using `#[playbook(...)]` and add the source file path to `whitelist` variable.
