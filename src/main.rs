@@ -112,6 +112,7 @@ fn invoke(src: Context, ctx_step: Context) {
     let src_path = Path::new(src_path_str);
     if let Some(ext_os) = src_path.extension() {
         let ext = ext_os.to_str().unwrap();
+        #[allow(unused_variables)]
         let wrapper = |whichever: JobSpawner| {
             println!("{}", "== Output =======================".blue());
             if let Err(_) = whichever(src, ctx_step) {
