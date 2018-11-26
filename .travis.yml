@@ -1,0 +1,11 @@
+sudo: required
+services:
+- docker
+language: rust
+rust:
+- stable
+- beta
+- nightly
+cache: cargo
+script:
+- cargo build --no-default-features --features base
