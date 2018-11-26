@@ -2,10 +2,19 @@ sudo: required
 services:
 - docker
 language: rust
-rust:
-- stable
-- beta
-- nightly
 cache: cargo
+matrix:
+  include:
+  - rust: stable
+    env: FEATURES="--no-default-features --features base"
+  - rust: beta
+    env: FEATURES="--no-default-features --features base"
+  - rust: nightly
+    env: FEATURES="" # support different python versions? https://github.com/PyO3/pyo3/blob/master/.travis.yml
+before_install:
+- sudo apt-get update
+- sudo apt-get install -y python3 python3-dev
+- sudo ln -sf /usr/bin/python3 /usr/bin/python
 script:
-- cargo build --no-default-features --features base
+- cargo build ${FEATURES}
+- cargo test ${FEATURES}
