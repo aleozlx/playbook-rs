@@ -105,7 +105,7 @@ pub fn docker_start<I, S>(ctx_docker: Context, cmd: I) -> Result<(), JobError>
                     let suffix = if dst.ends_with(":ro") || dst.ends_with(":rw") || dst.ends_with(":z") || dst.ends_with(":Z") { "" } else { ":ro" };
                     if let Ok(src) = Path::new(src).canonicalize() {
                         docker_run.push(String::from("-v"));
-                        docker_run.push(format!("{}:{}{}", src.to_str().unwrap(), dst, suffix));
+                        docker_run.push(format!("{}{}{}", src.to_str().unwrap(), dst, suffix));
                     }
                 }
             }
