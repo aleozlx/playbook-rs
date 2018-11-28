@@ -6,7 +6,7 @@ then
   exec bash # enter root shell when no identity is specified
 fi
 
-RULE="^uid=([0-9]+)\((.*)\) gid=([0-9]+)\((.*)\) .*$"
+RULE="^uid=([0-9]+)\((\w*)\) gid=([0-9]+)\((\w*)\) .*$"
 
 function impersonate {
   # mkdir -p "/home/${username}/workspace"
