@@ -23,5 +23,5 @@ RUN patch /usr/lib/python3.5/importlib/util.py /tmp/util.patch
 # Rustup & Cargo
 RUN apt-get -y install file
 RUN wget -P /tmp --quiet https://static.rust-lang.org/rustup/dist/x86_64-unknown-linux-gnu/rustup-init && chmod +x /tmp/rustup-init && /tmp/rustup-init --default-toolchain nightly -y
-RUN /root/.cargo/bin/cargo install playbook --version 0.2.2 && cp /root/.cargo/bin/playbook /usr/bin
+RUN /root/.cargo/bin/cargo install playbook --version 0.2.5 && cp /root/.cargo/bin/playbook /usr/bin
 ENTRYPOINT ["/bin/tkstack-start.sh"] 
