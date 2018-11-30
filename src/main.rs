@@ -54,8 +54,25 @@ fn inside_docker() -> bool {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct JobError {}
+#[derive(Debug, Clone, PartialEq)]
+pub enum JobErrorSource {
+    NixError(nix::Error),
+    ExitCode(i32),
+    Signal(nix::sys::signal::Signal),
+    Internal
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct JobError {
+    msg: String,
+    src: JobErrorSource
+}
+
+impl std::fmt::Display for JobError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", &self.msg)
+    }
+}
 
 type BuiltIn = fn(Context) -> !;
 type JobSpawner = fn(src: Context, ctx_step: Context) -> Result<(), JobError>;
@@ -115,9 +132,9 @@ fn invoke(src: Context, ctx_step: Context) {
         #[allow(unused_variables)]
         let wrapper = |whichever: JobSpawner| {
             println!("{}", "== Output =======================".blue());
-            if let Err(_) = whichever(src, ctx_step) {
-                error!("Crash: A task internal error has occurred.");
-                std::process::exit(ERR_JOB);
+            if let Err(e) = whichever(src, ctx_step) {
+                error!("The task has internally crashed: {}", e);
+                std::process::exit(ERR_JOB); // TODO Don't exit the wrapper, return error instead.
             }
             println!("{}", "== EOF ==========================".blue());
         };
