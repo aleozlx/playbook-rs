@@ -20,6 +20,13 @@ pub fn invoke_py(src: Context, ctx_step: Context) -> Result<(), JobError> {
     let py = gil.python();
     let syspath: &PyList = py.import("sys").unwrap().get("path").unwrap().try_into().unwrap();
     let ref src_path: String = src.unpack("src").unwrap();
+    if let Some(CtxObj::Array(sys_paths)) = src.get("sys_path") {
+        for item in sys_paths {
+            if let CtxObj::Str(sys_path) = item {
+                syspath.insert(0, sys_path).unwrap();
+            }
+        }
+    }
     let mod_path;
     if let Some(parent) = Path::new(src_path).parent() {
         mod_path = parent;
