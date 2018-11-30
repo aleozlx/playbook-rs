@@ -269,8 +269,13 @@ fn run_step(ctx_step: Context) {
                             }
                             match spawner::docker_start(ctx_docker.clone(), resume_params) {
                                 Ok(()) => {},
-                                Err(_) => {
-                                    error!("{}", "Container has crashed".red().bold());
+                                Err(e) => {
+                                    match e.src {
+                                        JobErrorSource::NixError(_) | JobErrorSource::ExitCode(_) | JobErrorSource::Signal(_) => {
+                                            error!("{}: {}", "Container has crashed".red().bold(), e);
+                                        },
+                                        JobErrorSource::Internal => ()
+                                    }
                                     std::process::exit(ERR_JOB);
                                 }
                             }
