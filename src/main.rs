@@ -438,10 +438,10 @@ fn main() {
             playbook = Path::new(relocate).join(playbook.file_name().unwrap());
         }
     }
-    if ctx_args.get("docker-step").is_none() {
-        // TODO this is already assuming sandbox mode
-        // unsafe { signal(2, just_ignore); }
-    }
+    // if ctx_args.get("docker-step").is_none() {
+    //     // TODO this is already assuming sandbox mode
+    //     // unsafe { signal(2, just_ignore); }
+    // }
     match run_yaml(&playbook, ctx_args) {
         Ok(()) => (),
         Err(e) => {
@@ -451,8 +451,8 @@ fn main() {
     }
 }
 
-extern "C" {
-    fn signal(sig: u32, cb: extern fn(u32)) -> extern fn(u32);
-}
+// extern "C" {
+//     fn signal(sig: u32, cb: extern fn(u32)) -> extern fn(u32);
+// }
 
-extern fn just_ignore(_: u32) { }
+// extern fn just_ignore(_: u32) { }
