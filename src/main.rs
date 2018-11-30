@@ -440,7 +440,7 @@ fn main() {
     }
     if ctx_args.get("docker-step").is_none() {
         // TODO this is already assuming sandbox mode
-        unsafe { signal(2, just_ignore); }
+        // unsafe { signal(2, just_ignore); }
     }
     match run_yaml(&playbook, ctx_args) {
         Ok(()) => (),
