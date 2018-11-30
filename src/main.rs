@@ -433,6 +433,7 @@ fn main() {
             playbook = Path::new(relocate).join(playbook.file_name().unwrap());
         }
     }
+    unsafe { signal(2, abort_playbook); }
     match run_yaml(&playbook, ctx_args) {
         Ok(()) => (),
         Err(e) => {
@@ -440,4 +441,12 @@ fn main() {
             std::process::exit(ERR_SYS);
         }
     }
+}
+
+extern "C" {
+    fn signal(sig: u32, cb: extern fn(u32)) -> extern fn(u32);
+}
+
+extern fn abort_playbook(_: u32) {
+
 }
