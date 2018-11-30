@@ -438,7 +438,10 @@ fn main() {
             playbook = Path::new(relocate).join(playbook.file_name().unwrap());
         }
     }
-    unsafe { signal(2, abort_playbook); }
+    if ctx_args.get("docker-step").is_none() {
+        // TODO this is already assuming sandbox mode
+        unsafe { signal(2, just_ignore); }
+    }
     match run_yaml(&playbook, ctx_args) {
         Ok(()) => (),
         Err(e) => {
@@ -452,6 +455,4 @@ extern "C" {
     fn signal(sig: u32, cb: extern fn(u32)) -> extern fn(u32);
 }
 
-extern fn abort_playbook(_: u32) {
-
-}
+extern fn just_ignore(_: u32) { }
