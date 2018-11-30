@@ -13,7 +13,7 @@ RUN pip3 install --upgrade pip
 RUN BLAS=/usr/lib/libblas/libblas.so LAPACK=/usr/lib/lapack/liblapack.so pip3 --no-cache-dir install numpy>=1.15.4 scipy numba
 
 # Playbook-rs DevOps
-RUN /root/.cargo/bin/cargo install playbook --version 0.2.6 && cp /root/.cargo/bin/playbook /usr/bin
+RUN /root/.cargo/bin/cargo install playbook --version 0.2.7 && cp /root/.cargo/bin/playbook /usr/bin
 
 COPY bashrc.sh /bin/tkstack-bashrc.sh
 COPY start.sh /bin/tkstack-start.sh
