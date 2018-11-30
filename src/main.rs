@@ -145,7 +145,7 @@ fn invoke(src: Context, ctx_step: Context) {
             println!("{}", "== EOF ==========================".blue());
             return last_words;
         };
-        let ret = match ext {
+        let ret: Result<(), Option<String>> = match ext {
             #[cfg(feature = "spawner_python")]
             "py" => wrapper(spawner::invoke_py),
             _ => Err(Some(format!("It is not clear how to run {}.", src_path_str)))
