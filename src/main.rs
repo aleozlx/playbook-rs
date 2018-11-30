@@ -130,18 +130,31 @@ fn invoke(src: Context, ctx_step: Context) {
     if let Some(ext_os) = src_path.extension() {
         let ext = ext_os.to_str().unwrap();
         #[allow(unused_variables)]
-        let wrapper = |whichever: JobSpawner| {
+        let wrapper = |whichever: JobSpawner| -> Result<(), Option<String>> {
+            let last_words;
             println!("{}", "== Output =======================".blue());
-            if let Err(e) = whichever(src, ctx_step) {
-                error!("The task has internally crashed: {}", e);
-                std::process::exit(ERR_JOB); // TODO Don't exit the wrapper, return error instead.
+            last_words = if let Err(e) = whichever(src, ctx_step) {
+                match e.src {
+                    JobErrorSource::NixError(_) | JobErrorSource::ExitCode(_) | JobErrorSource::Signal(_) => {
+                        Err(Some(format!("{}", e)))
+                    },
+                    JobErrorSource::Internal => Err(None)
+                }
             }
+            else { Ok(()) };
             println!("{}", "== EOF ==========================".blue());
+            return last_words;
         };
-        match ext {
+        let ret = match ext {
             #[cfg(feature = "spawner_python")]
             "py" => wrapper(spawner::invoke_py),
-            _ => warn!("It is not clear how to run {}.", src_path_str)
+            _ => Err(Some(format!("It is not clear how to run {}.", src_path_str)))
+        };
+        if let Err(last_words) = ret {
+            if let Some(msg) = last_words {
+                error!("{}", msg);
+            }
+            std::process::exit(ERR_JOB);
         }
     }
     else {

@@ -148,7 +148,9 @@ pub fn docker_start<I, S>(ctx_docker: Context, cmd: I) -> Result<(), JobError>
     if let Some(CtxObj::Str(image_name)) = ctx_docker.get("image") {
         docker_run.push(image_name.to_owned());
     }
-    else { return Err(JobError {  msg: String::from("The Docker image specification was invalid."), src: JobErrorSource::Internal }); }
+    else {
+        return Err(JobError {  msg: String::from("The Docker image specification was invalid."), src: JobErrorSource::Internal });
+    }
     docker_run.extend::<Vec<String>>(cmd.into_iter().map(|s| {s.as_ref().to_str().unwrap().to_owned()}).collect());
     info!("{}", format_cmd(docker_run.clone()));
     let docker_linux: Vec<CString> = docker_run.iter().map(|s| {CString::new(s as &str).unwrap()}).collect();
