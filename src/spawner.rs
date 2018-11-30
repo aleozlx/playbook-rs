@@ -94,7 +94,7 @@ pub fn docker_start<I, S>(ctx_docker: Context, cmd: I) -> Result<(), JobError>
     let mut userinfo = HashMap::new();
     copy_user_info(&mut userinfo, &username);
     let home = format!("/home/{}", &username);
-    let mut docker_run: Vec<String> = ["docker", "run", "--rm", "-t", "--net=host"].iter().map(|&s| {s.to_owned()}).collect();
+    let mut docker_run: Vec<String> = ["docker", "run", "--rm", "--init", "-t", "--net=host"].iter().map(|&s| {s.to_owned()}).collect();
     // docker_run.push(String::from("-v"));
     // docker_run.push(format!("{}:/usr/bin/playbook", std::env::current_exe().unwrap().to_str().unwrap()));
     docker_run.push(String::from("-v"));
