@@ -7,6 +7,7 @@ extern crate ymlctx;
 extern crate colored;
 extern crate regex;
 extern crate nix;
+extern crate impersonate;
 
 #[cfg(feature = "spawner_python")]
 extern crate pyo3;
