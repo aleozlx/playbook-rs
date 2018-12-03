@@ -179,12 +179,12 @@ steps:
 
 ## Security assumptions
 
-> **Host file system**: volumes specified in your playbook will be mounted read-only by default, which you may override. The current working directory is mounted read-only automatically. Playbook assumes that you use a docker image that uses non-root user whose uid:gid **hopefully** maps to you on host system.
+> **Host file system**: volumes specified in your playbook will be mounted read-only by default, which you may override. The current working directory is mounted read-only automatically. Playbook assumes that you use a docker image that uses non-root user whose uid:gid **hopefully** maps to you on host system. Issue [#7](https://github.com/aleozlx/playbook-rs/issues/7) is created to alleviate this.
 
-> **Network**: network services inside docker are **not isolated** from host in non-interactive mode to provide **convenient access** to host databases etc. Playbook assumes whatever you are operationalizing is trusted and that your host should have a proper set of INPUT rules, and that services inside docker should be protected by an independent firewall if necessary.
+> **Network**: network services inside docker are **not isolated** from host in non-interactive mode to provide **convenient access** to host databases etc. Playbook assumes whatever you are operationalizing is trusted and that your host should have a proper set of INPUT rules, and that services inside docker should be protected by an independent firewall if necessary. (This will be isolated in the future.)
 
-> **X11**: the recommended docker image does intend to provide isolated X11 access by creating non-root user that **presumably** maps to you on host and your X authentication files are naturally mounted with proper permissions already in place.
+> **X11**: the recommended docker image does intend to provide isolated X11 access (TODO reference needed here) by creating non-root user that **presumably** maps to you on host and your X authentication files are naturally mounted with proper permissions already in place. Issue [#7](https://github.com/aleozlx/playbook-rs/issues/7) is created to alleviate this.
 
-> **Playbook itself**: the playbook itself is obviously a very capable shell program. It is based on a simple whitelist to establish its symbol namespace and allow any actions to be executed. Predictable behaviors of the program relies on the `playbook` binaries share the same version both on the host and in the container.
+> **Playbook itself**: the playbook itself is obviously a very capable shell program. It is based on a simple whitelist to establish its symbol namespace and allow any actions to be executed. Predictable behaviors of the program relies on the `playbook` binaries share the same version both on the host and in the container. Issue [#3](https://github.com/aleozlx/playbook-rs/issues/3) is created to alleviate this.
 
 
