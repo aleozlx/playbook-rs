@@ -94,21 +94,24 @@ pub fn docker_start<I, S>(ctx_docker: Context, cmd: I) -> Result<(), JobError>
     let mut userinfo = HashMap::new();
     copy_user_info(&mut userinfo, &username);
     let home = format!("/home/{}", &username);
-    let mut docker_run: Vec<String> = ["docker", "run", "--rm", "--init", "-t", "--net=host"].iter().map(|&s| {s.to_owned()}).collect();
+    let mut docker_run: Vec<String> = ["docker", "run", "--init", "--rm"].iter().map(|&s| {s.to_owned()}).collect();
+    if let Some(CtxObj::Bool(interactive)) = ctx_docker.get("interactive") {
+        if *interactive {
+            docker_run.push(String::from("-it"));
+        }
+    }
+    else {
+        docker_run.push(String::from("-it"));
+    }
+    if let Some(CtxObj::Str(runtime)) = ctx_docker.get("runtime") {
+        docker_run.push(format!("--runtime={}", runtime));
+    }
     docker_run.push(String::from("-v"));
     docker_run.push(format!("{}:{}/current-ro:ro", std::env::current_dir().unwrap().to_str().unwrap(), &home));
     docker_run.push(String::from("-w"));
     docker_run.push(format!("{}/current-ro", &home));
     docker_run.push(String::from("-e"));
     docker_run.push(format!("TKSTACK_USER={}", &stdout));
-    if let Some(CtxObj::Str(runtime)) = ctx_docker.get("runtime") {
-        docker_run.push(format!("--runtime={}", runtime));
-    }
-    if let Some(CtxObj::Bool(interactive)) = ctx_docker.get("interactive") {
-        if *interactive {
-            docker_run.push(String::from("-i"));
-        }
-    }
     if let Some(CtxObj::Str(ipc_namespace)) = ctx_docker.get("ipc") {
         docker_run.push(String::from("--ipc"));
         docker_run.push(ipc_namespace.to_owned());
@@ -138,7 +141,7 @@ pub fn docker_start<I, S>(ctx_docker: Context, cmd: I) -> Result<(), JobError>
     if let Some(CtxObj::Bool(gui)) = ctx_docker.get("gui") {
         if *gui {
             docker_run.extend::<Vec<String>>([
-                "-e", "DISPLAY", "-v", "/tmp/.X11-unix:/tmp/.X11-unix:rw",
+                "--net=host", "-e", "DISPLAY", "-v", "/tmp/.X11-unix:/tmp/.X11-unix:rw",
                 "-v", &format!("{}/.Xauthority:{}/.Xauthority:ro", userinfo["home_dir"], home), 
             ].iter().map(|&s| {s.to_owned()}).collect());
         }
@@ -151,8 +154,8 @@ pub fn docker_start<I, S>(ctx_docker: Context, cmd: I) -> Result<(), JobError>
             }
         }
     }
-    if let Some(CtxObj::Str(container_name)) = ctx_docker.get("container_name") {
-        docker_run.push(format!("--name={}", container_name));
+    if let Some(CtxObj::Str(name)) = ctx_docker.get("name") {
+        docker_run.push(format!("--name={}", name));
     }
     if let Some(CtxObj::Str(image_name)) = ctx_docker.get("image") {
         docker_run.push(image_name.to_owned());
