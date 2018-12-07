@@ -433,16 +433,11 @@ fn main() {
             error!("Context error: Not inside of a Docker container.");
             std::process::exit(ERR_APP);
         }
-        // Especially, absolute path to the playbook must be self-mounted with relocation specified at cmdline,
-        //   because we cannot read any content of the playbook without locating it first.
+        // * Related issue: https://github.com/aleozlx/playbook-rs/issues/6
         if let Some(relocate) = args.value_of("RELOCATE") {
             playbook = Path::new(relocate).join(playbook.file_name().unwrap());
         }
     }
-    // if ctx_args.get("docker-step").is_none() {
-    //     // TODO this is already assuming sandbox mode
-    //     // unsafe { signal(2, just_ignore); }
-    // }
     match run_yaml(&playbook, ctx_args) {
         Ok(()) => (),
         Err(e) => {
