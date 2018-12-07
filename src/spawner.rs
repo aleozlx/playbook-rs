@@ -109,6 +109,10 @@ pub fn docker_start<I, S>(ctx_docker: Context, cmd: I) -> Result<(), JobError>
             docker_run.push(String::from("-i"));
         }
     }
+    if let Some(CtxObj::Str(ipc_namespace)) = ctx_docker.get("ipc") {
+        docker_run.push(String::from("--ipc"));
+        docker_run.push(ipc_namespace.to_owned());
+    }
     if let Some(CtxObj::Array(volumes)) = ctx_docker.get("volumes") {
         for v in volumes {
             if let CtxObj::Str(vol) = v {
