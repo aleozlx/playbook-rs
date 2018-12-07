@@ -159,7 +159,7 @@ fn invoke(src: Context, ctx_step: Context) {
         }
     }
     else {
-        // Possibly a binary?
+        // TODO C-style FFI invocation
         unimplemented!();
     }
 }
@@ -183,9 +183,6 @@ fn resolve<'step>(ctx_step: &'step Context, whitelist: &Vec<Context>) -> (Option
     else { return (None, None); }
     if let CtxObj::Str(action) = key_action {
         let action: &'step str = action;
-        // if action.starts_with("step_") {
-        //     warn!("Action name should not be prefixed by \"step_\": {}", action.cyan());
-        // }
         for ctx_source in whitelist {
             if let Some(CtxObj::Str(src)) = ctx_source.get("src") {
                 let ref playbook: String = ctx_step.unpack("playbook").unwrap();
@@ -420,7 +417,6 @@ fn main() {
     }
     let ctx_args = Context::new()
         .set_opt("docker-step", _helper(args.value_of("DOCKER_STEP")))
-        // .set_opt("container-name", _helper(args.value_of("CONTAINER_NAME")))
         .set_opt("relocate", _helper(args.value_of("RELOCATE")))
         .set_opt("playbook", _helper(args.value_of("PLAYBOOK")))
         .set_opt("verbose-fern", match args.occurrences_of("VERBOSE") {
