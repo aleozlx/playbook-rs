@@ -76,7 +76,7 @@ pub fn format_cmd<I>(cmd: I) -> String
     cmd.into_iter().map(|s| { if s.contains(" ") { format!("\"{}\"", s) } else { s.to_owned() } }).collect::<Vec<String>>().join(" ")
 }
 
-pub fn docker_start<I, S>(ctx_docker: Context, cmd: I) -> Result<(), JobError>
+pub fn docker_start<I, S>(ctx_docker: Context, cmd: I) -> Result<String, JobError>
   where I: IntoIterator<Item = S>, S: AsRef<OsStr>
 {
     let username;
@@ -107,6 +107,7 @@ pub fn docker_start<I, S>(ctx_docker: Context, cmd: I) -> Result<(), JobError>
     docker_run.push(String::from("--cap-add=MKNOD"));
     docker_run.push(String::from("--cap-add=SETUID"));
     docker_run.push(String::from("--cap-add=SETGID"));
+    docker_run.push(String::from("--cap-add=CHOWN"));
     if let Some(CtxObj::Str(runtime)) = ctx_docker.get("runtime") {
         docker_run.push(format!("--runtime={}", runtime));
     }
@@ -168,7 +169,8 @@ pub fn docker_start<I, S>(ctx_docker: Context, cmd: I) -> Result<(), JobError>
         return Err(JobError {  msg: String::from("The Docker image specification was invalid."), src: JobErrorSource::Internal });
     }
     docker_run.extend::<Vec<String>>(cmd.into_iter().map(|s| {s.as_ref().to_str().unwrap().to_owned()}).collect());
-    info!("{}", format_cmd(docker_run.clone()));
+    let docker_cmd = format_cmd(docker_run.clone());
+    info!("{}", &docker_cmd);
     let docker_linux: Vec<CString> = docker_run.iter().map(|s| {CString::new(s as &str).unwrap()}).collect();
     match fork() {
         Ok(ForkResult::Child) => {
@@ -181,7 +183,7 @@ pub fn docker_start<I, S>(ctx_docker: Context, cmd: I) -> Result<(), JobError>
             match waitpid(child, None) {
                 Ok(status) => match status {
                     WaitStatus::Exited(_, exit_code) => {
-                        if exit_code == 0 { Ok(()) }
+                        if exit_code == 0 { Ok(docker_cmd) }
                         else {
                             Err(JobError {
                                 msg: format!("The container has returned a non-zero exit code ({}).", exit_code.to_string().red()),

@@ -75,7 +75,7 @@ fn sys_shell(ctx: Context) -> ! {
                 }
             }));
             match spawner::docker_start(ctx_docker, &["bash", "-c", &cmd]) {
-                Ok(()) => {
+                Ok(_) => {
                     std::process::exit(SUCCESS);
                 },
                 Err(_) => {
@@ -87,7 +87,7 @@ fn sys_shell(ctx: Context) -> ! {
         else {
             warn!("{}", "Just a bash shell. Here goes nothing.".purple());
             match spawner::docker_start(ctx_docker.set("interactive", CtxObj::Bool(true)), &["bash"]) {
-                Ok(()) => {
+                Ok(_) => {
                     std::process::exit(SUCCESS);
                 },
                 Err(_) => {
@@ -103,7 +103,7 @@ fn sys_shell(ctx: Context) -> ! {
     }
 }
 
-mod spawner;
+pub mod spawner;
 fn invoke(src: Context, ctx_step: Context) {
     let ref action: String = ctx_step.unpack("action").unwrap();
     let ref src_path_str: String = src.unpack("src").unwrap();
@@ -249,7 +249,7 @@ fn run_step(ctx_step: Context) {
                                 }
                             }
                             match spawner::docker_start(ctx_docker.clone(), resume_params) {
-                                Ok(()) => {},
+                                Ok(_docker_cmd) => {},
                                 Err(e) => {
                                     match e.src {
                                         JobErrorSource::NixError(_) | JobErrorSource::ExitCode(_) | JobErrorSource::Signal(_) => {
