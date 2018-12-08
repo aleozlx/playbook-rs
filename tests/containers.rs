@@ -33,7 +33,7 @@ mod test_containers {
     fn docker_start01(){
         let scratch = get_scratch();
         let ctx_docker = Context::new()
-            .set("image", CtxObj::Str(String::from("aleozlx/playbook-tensorflow"))) // TODO use impersonate to mod the image
+            .set("image", CtxObj::Str(String::from("aleozlx/playbook-test1"))) // TODO use impersonate to mod the image
             .set("volumes", CtxObj::Array(vec![CtxObj::Str(format!("{}:/scratch:rw", scratch.path().to_str().unwrap()))]));
         match playbook_api::spawner::docker_start(ctx_docker, &["echo Hello World > /scratch/output.txt"]) {
             Ok(_docker_cmd) => {

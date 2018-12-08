@@ -107,7 +107,7 @@ pub fn docker_start<I, S>(ctx_docker: Context, cmd: I) -> Result<String, JobErro
     docker_run.push(String::from("--cap-add=MKNOD"));
     docker_run.push(String::from("--cap-add=SETUID"));
     docker_run.push(String::from("--cap-add=SETGID"));
-    docker_run.push(String::from("--cap-add=CHOWN"));
+    docker_run.push(String::from("--cap-add=CHOWN")); // TODO possibility to restrict this?
     if let Some(CtxObj::Str(runtime)) = ctx_docker.get("runtime") {
         docker_run.push(format!("--runtime={}", runtime));
     }
