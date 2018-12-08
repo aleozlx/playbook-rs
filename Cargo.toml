@@ -30,3 +30,6 @@ impersonate = "0.0.1"
 
 [dev-dependencies]
 tempfile = "3.0.5"
+
+[badges]
+travis-ci = { repository = "...", branch = "master" }

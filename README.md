@@ -1,4 +1,7 @@
 # playbook-rs
+
+[![Build Status](https://travis-ci.org/aleozlx/playbook-rs.svg?branch=master)](https://travis-ci.org/aleozlx/playbook-rs)
+
 YAML driven Docker DevOps
 
 > Allows customization of container environment individually for each step, and forwarding context variables in data structures native to the language of the task being run.
