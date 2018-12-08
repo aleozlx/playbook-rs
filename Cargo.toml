@@ -7,6 +7,9 @@ license = "Apache-2.0 OR MIT"
 readme = "README.md"
 repository = "https://github.com/aleozlx/playbook-rs.git"
 
+[lib]
+name = "playbook_api"
+
 [features]
 base = []
 default = ["spawner_python"]
