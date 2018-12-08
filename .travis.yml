@@ -10,7 +10,8 @@ matrix:
   - rust: beta
     env: FEATURES="--no-default-features --features base"
   - rust: nightly
-    env: FEATURES="" # support different python versions? https://github.com/PyO3/pyo3/blob/master/.travis.yml
+    env: FEATURES="--no-default-features --features base"
+  # support different python versions? https://github.com/PyO3/pyo3/blob/master/.travis.yml
 before_install:
 - docker build -t aleozlx/playbook-test1 tests/test1
 - sudo apt-get update
