@@ -6,7 +6,8 @@ use ymlctx::context::{Context, CtxObj};
 use regex::Regex;
 use nix::unistd::{fork, execvp, ForkResult};
 use nix::sys::wait::{waitpid, WaitStatus};
-use crate::JobError;
+use crate::{JobError, JobErrorSource};
+use colored::Colorize;
 
 #[cfg(feature = "spawner_python")]
 use pyo3::prelude::*;
@@ -19,6 +20,13 @@ pub fn invoke_py(src: Context, ctx_step: Context) -> Result<(), JobError> {
     let py = gil.python();
     let syspath: &PyList = py.import("sys").unwrap().get("path").unwrap().try_into().unwrap();
     let ref src_path: String = src.unpack("src").unwrap();
+    if let Some(CtxObj::Array(sys_paths)) = src.get("sys_path") {
+        for item in sys_paths {
+            if let CtxObj::Str(sys_path) = item {
+                syspath.insert(0, sys_path).unwrap();
+            }
+        }
+    }
     let mod_path;
     if let Some(parent) = Path::new(src_path).parent() {
         mod_path = parent;
@@ -35,15 +43,19 @@ pub fn invoke_py(src: Context, ctx_step: Context) -> Result<(), JobError> {
     else {
         unreachable!();
     }
-    let mod_py = py.import(mod_name).unwrap();
 
-    let ref action: String = ctx_step.unpack("action").unwrap();
-    match mod_py.call_method1(action, (ctx_step.to_object(py), )) {
-        Ok(_) => Ok(()),
-        Err(e) => {
-            e.print(py);
-            Err(JobError {})
+    if let Ok(mod_py) = py.import(mod_name) {
+        let ref action: String = ctx_step.unpack("action").unwrap();
+        match mod_py.call_method1(action, (ctx_step.to_object(py), )) {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                e.print(py);
+                Err(JobError { msg: String::from("There was an exception raised by the step action."), src: JobErrorSource::Internal })
+            }
         }
+    }
+    else {
+        Err(JobError { msg: String::from("Failed to import the step action source module."), src: JobErrorSource::Internal })
     }
 }
 
@@ -76,27 +88,38 @@ pub fn docker_start<I, S>(ctx_docker: Context, cmd: I) -> Result<(), JobError>
     if let Some(caps) = rule.captures(&stdout) {
         username = caps.name("user").unwrap().as_str().to_owned();
     }
-    else { return Err(JobError {}); }
+    else {
+        return Err(JobError { msg: String::from("Failed to identify the user."), src: JobErrorSource::Internal });
+    }
     let mut userinfo = HashMap::new();
     copy_user_info(&mut userinfo, &username);
     let home = format!("/home/{}", &username);
-    let mut docker_run: Vec<String> = ["docker", "run", "--rm", "-t", "--net=host"].iter().map(|&s| {s.to_owned()}).collect();
-    // docker_run.push(String::from("-v"));
-    // docker_run.push(format!("{}:/usr/bin/playbook", std::env::current_exe().unwrap().to_str().unwrap()));
+    let mut docker_run: Vec<String> = ["docker", "run", "--init", "--rm"].iter().map(|&s| {s.to_owned()}).collect();
+    if let Some(CtxObj::Bool(interactive)) = ctx_docker.get("interactive") {
+        if *interactive {
+            docker_run.push(String::from("-it"));
+        }
+    }
+    else {
+        docker_run.push(String::from("-it"));
+    }
+    docker_run.push(String::from("--cap-drop=ALL"));
+    docker_run.push(String::from("--cap-add=MKNOD"));
+    docker_run.push(String::from("--cap-add=SETUID"));
+    docker_run.push(String::from("--cap-add=SETGID"));
+    if let Some(CtxObj::Str(runtime)) = ctx_docker.get("runtime") {
+        docker_run.push(format!("--runtime={}", runtime));
+    }
+    if let Some(CtxObj::Str(ipc_namespace)) = ctx_docker.get("ipc") {
+        docker_run.push(String::from("--ipc"));
+        docker_run.push(ipc_namespace.to_owned());
+    }
     docker_run.push(String::from("-v"));
     docker_run.push(format!("{}:{}/current-ro:ro", std::env::current_dir().unwrap().to_str().unwrap(), &home));
     docker_run.push(String::from("-w"));
     docker_run.push(format!("{}/current-ro", &home));
     docker_run.push(String::from("-e"));
     docker_run.push(format!("TKSTACK_USER={}", &stdout));
-    if let Some(CtxObj::Str(runtime)) = ctx_docker.get("runtime") {
-        docker_run.push(format!("--runtime={}", runtime));
-    }
-    if let Some(CtxObj::Bool(interactive)) = ctx_docker.get("interactive") {
-        if *interactive {
-            docker_run.push(String::from("-i"));
-        }
-    }
     if let Some(CtxObj::Array(volumes)) = ctx_docker.get("volumes") {
         for v in volumes {
             if let CtxObj::Str(vol) = v {
@@ -105,7 +128,7 @@ pub fn docker_start<I, S>(ctx_docker: Context, cmd: I) -> Result<(), JobError>
                     let suffix = if dst.ends_with(":ro") || dst.ends_with(":rw") || dst.ends_with(":z") || dst.ends_with(":Z") { "" } else { ":ro" };
                     if let Ok(src) = Path::new(src).canonicalize() {
                         docker_run.push(String::from("-v"));
-                        docker_run.push(format!("{}:{}{}", src.to_str().unwrap(), dst, suffix));
+                        docker_run.push(format!("{}{}{}", src.to_str().unwrap(), dst, suffix));
                     }
                 }
             }
@@ -122,7 +145,7 @@ pub fn docker_start<I, S>(ctx_docker: Context, cmd: I) -> Result<(), JobError>
     if let Some(CtxObj::Bool(gui)) = ctx_docker.get("gui") {
         if *gui {
             docker_run.extend::<Vec<String>>([
-                "-e", "DISPLAY", "-v", "/tmp/.X11-unix:/tmp/.X11-unix:rw",
+                "--net=host", "-e", "DISPLAY", "-v", "/tmp/.X11-unix:/tmp/.X11-unix:rw",
                 "-v", &format!("{}/.Xauthority:{}/.Xauthority:ro", userinfo["home_dir"], home), 
             ].iter().map(|&s| {s.to_owned()}).collect());
         }
@@ -135,21 +158,23 @@ pub fn docker_start<I, S>(ctx_docker: Context, cmd: I) -> Result<(), JobError>
             }
         }
     }
-    if let Some(CtxObj::Str(container_name)) = ctx_docker.get("container_name") {
-        docker_run.push(format!("--name={}", container_name));
+    if let Some(CtxObj::Str(name)) = ctx_docker.get("name") {
+        docker_run.push(format!("--name={}", name));
     }
     if let Some(CtxObj::Str(image_name)) = ctx_docker.get("image") {
         docker_run.push(image_name.to_owned());
     }
-    else { return Err(JobError {}); }
+    else {
+        return Err(JobError {  msg: String::from("The Docker image specification was invalid."), src: JobErrorSource::Internal });
+    }
     docker_run.extend::<Vec<String>>(cmd.into_iter().map(|s| {s.as_ref().to_str().unwrap().to_owned()}).collect());
     info!("{}", format_cmd(docker_run.clone()));
     let docker_linux: Vec<CString> = docker_run.iter().map(|s| {CString::new(s as &str).unwrap()}).collect();
     match fork() {
         Ok(ForkResult::Child) => {
             match execvp(&CString::new("docker").unwrap(), &docker_linux) {
-                Ok(_) => Ok(()),
-                Err(_) => Err(JobError {}),
+                Ok(_void) => unreachable!(),
+                Err(e) => Err(JobError { msg: String::from("Failed to issue the Docker command."), src: JobErrorSource::NixError(e) }),
             }
         },
         Ok(ForkResult::Parent { child, .. }) => {
@@ -157,10 +182,18 @@ pub fn docker_start<I, S>(ctx_docker: Context, cmd: I) -> Result<(), JobError>
                 Ok(status) => match status {
                     WaitStatus::Exited(_, exit_code) => {
                         if exit_code == 0 { Ok(()) }
-                        else { Err(JobError {}) } // TODO return exit_code
+                        else {
+                            Err(JobError {
+                                msg: format!("The container has returned a non-zero exit code ({}).", exit_code.to_string().red()),
+                                src: JobErrorSource::ExitCode(exit_code)
+                            })
+                        }
                     },
-                    WaitStatus::Signaled(_, _sig, _core_dump) => {
-                        Err(JobError {}) // TODO report signal
+                    WaitStatus::Signaled(_, sig, _core_dump) => {
+                        Err(JobError {
+                            msg: format!("The container has received a signal ({:?}).", sig),
+                            src: JobErrorSource::Signal(sig)
+                        })
                     },
                     WaitStatus::Stopped(_, _sig) => unreachable!(),
                     WaitStatus::PtraceEvent(..) => unimplemented!(),
@@ -168,10 +201,10 @@ pub fn docker_start<I, S>(ctx_docker: Context, cmd: I) -> Result<(), JobError>
                     WaitStatus::Continued(_) => unreachable!(),
                     WaitStatus::StillAlive => unreachable!()
                 },
-                Err(_) => Err(JobError {})
+                Err(e) => Err(JobError { msg: String::from("Failed to keep track of the child process."), src: JobErrorSource::NixError(e) })
             }
         },
-        Err(_) => Err(JobError {}),
+        Err(e) => Err(JobError { msg: String::from("Failed to spawn a new process."), src: JobErrorSource::NixError(e) }),
     }
 }
 

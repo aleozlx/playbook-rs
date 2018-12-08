@@ -7,6 +7,7 @@ extern crate ymlctx;
 extern crate colored;
 extern crate regex;
 extern crate nix;
+extern crate impersonate;
 
 #[cfg(feature = "spawner_python")]
 extern crate pyo3;
@@ -54,8 +55,25 @@ fn inside_docker() -> bool {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct JobError {}
+#[derive(Debug, Clone, PartialEq)]
+pub enum JobErrorSource {
+    NixError(nix::Error),
+    ExitCode(i32),
+    Signal(nix::sys::signal::Signal),
+    Internal
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct JobError {
+    msg: String,
+    src: JobErrorSource
+}
+
+impl std::fmt::Display for JobError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", &self.msg)
+    }
+}
 
 type BuiltIn = fn(Context) -> !;
 type JobSpawner = fn(src: Context, ctx_step: Context) -> Result<(), JobError>;
@@ -113,22 +131,35 @@ fn invoke(src: Context, ctx_step: Context) {
     if let Some(ext_os) = src_path.extension() {
         let ext = ext_os.to_str().unwrap();
         #[allow(unused_variables)]
-        let wrapper = |whichever: JobSpawner| {
+        let wrapper = |whichever: JobSpawner| -> Result<(), Option<String>> {
+            let last_words;
             println!("{}", "== Output =======================".blue());
-            if let Err(_) = whichever(src, ctx_step) {
-                error!("Crash: A task internal error has occurred.");
-                std::process::exit(ERR_JOB);
+            last_words = if let Err(e) = whichever(src, ctx_step) {
+                match e.src {
+                    JobErrorSource::NixError(_) | JobErrorSource::ExitCode(_) | JobErrorSource::Signal(_) => {
+                        Err(Some(format!("{}", e)))
+                    },
+                    JobErrorSource::Internal => Err(None)
+                }
             }
+            else { Ok(()) };
             println!("{}", "== EOF ==========================".blue());
+            return last_words;
         };
-        match ext {
+        let ret: Result<(), Option<String>> = match ext {
             #[cfg(feature = "spawner_python")]
             "py" => wrapper(spawner::invoke_py),
-            _ => warn!("It is not clear how to run {}.", src_path_str)
+            _ => Err(Some(format!("It is not clear how to run {}.", src_path_str)))
+        };
+        if let Err(last_words) = ret {
+            if let Some(msg) = last_words {
+                error!("{}", msg);
+            }
+            std::process::exit(ERR_JOB);
         }
     }
     else {
-        // Possibly a binary?
+        // TODO C-style FFI invocation
         unimplemented!();
     }
 }
@@ -152,9 +183,6 @@ fn resolve<'step>(ctx_step: &'step Context, whitelist: &Vec<Context>) -> (Option
     else { return (None, None); }
     if let CtxObj::Str(action) = key_action {
         let action: &'step str = action;
-        // if action.starts_with("step_") {
-        //     warn!("Action name should not be prefixed by \"step_\": {}", action.cyan());
-        // }
         for ctx_source in whitelist {
             if let Some(CtxObj::Str(src)) = ctx_source.get("src") {
                 let ref playbook: String = ctx_step.unpack("playbook").unwrap();
@@ -239,8 +267,13 @@ fn run_step(ctx_step: Context) {
                             }
                             match spawner::docker_start(ctx_docker.clone(), resume_params) {
                                 Ok(()) => {},
-                                Err(_) => {
-                                    error!("{}", "Container has crashed".red().bold());
+                                Err(e) => {
+                                    match e.src {
+                                        JobErrorSource::NixError(_) | JobErrorSource::ExitCode(_) | JobErrorSource::Signal(_) => {
+                                            error!("{}: {}", "Container has crashed".red().bold(), e);
+                                        },
+                                        JobErrorSource::Internal => ()
+                                    }
                                     std::process::exit(ERR_JOB);
                                 }
                             }
@@ -384,7 +417,6 @@ fn main() {
     }
     let ctx_args = Context::new()
         .set_opt("docker-step", _helper(args.value_of("DOCKER_STEP")))
-        // .set_opt("container-name", _helper(args.value_of("CONTAINER_NAME")))
         .set_opt("relocate", _helper(args.value_of("RELOCATE")))
         .set_opt("playbook", _helper(args.value_of("PLAYBOOK")))
         .set_opt("verbose-fern", match args.occurrences_of("VERBOSE") {
@@ -397,8 +429,7 @@ fn main() {
             error!("Context error: Not inside of a Docker container.");
             std::process::exit(ERR_APP);
         }
-        // Especially, absolute path to the playbook must be self-mounted with relocation specified at cmdline,
-        //   because we cannot read any content of the playbook without locating it first.
+        // * Related issue: https://github.com/aleozlx/playbook-rs/issues/6
         if let Some(relocate) = args.value_of("RELOCATE") {
             playbook = Path::new(relocate).join(playbook.file_name().unwrap());
         }
@@ -411,3 +442,9 @@ fn main() {
         }
     }
 }
+
+// extern "C" {
+//     fn signal(sig: u32, cb: extern fn(u32)) -> extern fn(u32);
+// }
+
+// extern fn just_ignore(_: u32) { }
