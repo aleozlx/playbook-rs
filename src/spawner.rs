@@ -179,6 +179,8 @@ pub fn docker_start<I, S>(ctx_docker: Context, cmd: I) -> Result<String, JobErro
     docker_run.extend::<Vec<String>>(cmd.into_iter().map(|s| {s.as_ref().to_str().unwrap().to_owned()}).collect());
     let docker_cmd = format_cmd(docker_run.clone());
     info!("{}", &docker_cmd);
+    #[cfg(test)] // Let's see the docker command during testing.
+    println!("{}", &docker_cmd);
     let docker_linux: Vec<CString> = docker_run.iter().map(|s| {CString::new(s as &str).unwrap()}).collect();
     match fork() {
         Ok(ForkResult::Child) => {
