@@ -63,6 +63,16 @@ fn main() {
         if let Some(relocate) = args.value_of("RELOCATE") {
             playbook = Path::new(relocate).join(playbook.file_name().unwrap());
         }
+
+        if let Ok(ref become_id) = std::env::var("TKSTACK_USER") {
+            match impersonate::User::from_id(become_id).unwrap().su() {
+                Ok(()) => (),
+                Err(e) => {
+                    error!("{}", e);
+                    std::process::exit(playbook_api::ERR_SYS);
+                }
+            }
+        }
     }
     match playbook_api::run_yaml(&playbook, ctx_args) {
         Ok(()) => (),
