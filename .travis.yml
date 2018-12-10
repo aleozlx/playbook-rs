@@ -19,5 +19,6 @@ before_install:
 # - sudo apt-get install -y python3 python3-dev
 # - sudo ln -sf /usr/bin/python3 /usr/bin/python
 script:
+- echo === Tavis User == $(id) ====
 - cargo build ${FEATURES}
 - cargo test ${FEATURES}
