@@ -1,15 +1,24 @@
 # playbook-rs
 YAML driven Docker DevOps
 
+> Allows customization of container environment individually for each step, and forwarding context variables in data structures native to the language of the task being run.
+
 ## Requirements
 
-* Python3.x
-* (Optional) nvidia-docker2 (Make sure you can `nvidia-smi` and `docker images`)
+* Docker - make sure you can run `docker images`
+* (Optional) Python - use `--no-default-features --features "base"` to waive this dependency
+* (Optional) nvidia-docker2 - make sure you can run `nvidia-smi` on host
 
 ## Installation
 
 ```sh
 cargo +nightly install playbook
+```
+
+or without Python:
+
+```sh
+cargo install playbook --no-default-features --features "base"
 ```
 
 ## Usage example
@@ -92,11 +101,11 @@ Host: Hi!
 
 ## How to add steps?
 
-1. Add a function `def something(ctx)`. Current execution context is in `ctx` as dict. **TODO** ~~Keys are proxied to attributes to save a lot of brackets and quotes.~~
+1. Add a function `def something(ctx)`. Current execution context is in `ctx` as dict. Keys are proxied to attributes to save a lot of brackets and quotes.
 
 ```python
 def something(ctx):
-    print(ctx['my_var'])
+    print(ctx.my_var)
 ```
 
 2. Whitelist your step function using `#[playbook(...)]` and add the source file path to `whitelist` variable.

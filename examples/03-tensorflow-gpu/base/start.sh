@@ -6,7 +6,7 @@ then
   exec bash # enter root shell when no identity is specified
 fi
 
-RULE="^uid=([0-9]+)\((.*)\) gid=([0-9]+)\((.*)\) .*$"
+RULE="^uid=([0-9]+)\((\w*)\) gid=([0-9]+)\((\w*)\) .*$"
 
 function impersonate {
   # mkdir -p "/home/${username}/workspace"
@@ -31,7 +31,6 @@ then
   groupname="${BASH_REMATCH[4]}"
   uid="${BASH_REMATCH[1]}"
   gid="${BASH_REMATCH[3]}"
-  #shift 1 # pop user identity
   ARGV="$@" # rename cmd arguments
   if [[ $username == "root" ]]
   then
