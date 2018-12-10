@@ -8,7 +8,7 @@ extern crate regex;
 extern crate nix;
 extern crate impersonate;
 
-#[cfg(feature = "spawner_python")]
+#[cfg(feature = "lang_python")]
 extern crate pyo3;
 
 use std::str;
@@ -16,30 +16,24 @@ use std::path::Path;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
+use std::collections::HashMap;
 use std::result::Result;
 use std::collections::HashSet;
 use yaml_rust::{Yaml, YamlLoader};
 use colored::*;
 use regex::Regex;
 pub use ymlctx::context::{Context, CtxObj};
+pub mod container;
+pub mod lang;
 
 pub const SUCCESS: i32 = 0;
 pub const ERR_SYS: i32 = 1;
 pub const ERR_APP: i32 = 2;
 pub const ERR_YML: i32 = 3;
-pub const ERR_JOB: i32 = 4;
-
-pub fn inside_docker() -> bool {
-    let status = std::process::Command::new("grep").args(&["-q", "docker", "/proc/1/cgroup"])
-        .status().expect("I/O error");
-    match status.code() {
-        Some(code) => code==0,
-        None => unreachable!()
-    }
-}
+pub const ERR_TASK: i32 = 4;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum JobErrorSource {
+pub enum TaskErrorSource {
     NixError(nix::Error),
     ExitCode(i32),
     Signal(nix::sys::signal::Signal),
@@ -47,34 +41,51 @@ pub enum JobErrorSource {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct JobError {
+pub struct TaskError {
     msg: String,
-    src: JobErrorSource
+    src: TaskErrorSource
 }
 
-impl std::fmt::Display for JobError {
+impl std::fmt::Display for TaskError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", &self.msg)
     }
 }
 
-type BuiltIn = fn(Context) -> !;
-type JobSpawner = fn(src: Context, ctx_step: Context) -> Result<(), JobError>;
+pub fn copy_user_info(facts: &mut HashMap<String, String>, user: &str) {
+    if let Some(output) = std::process::Command::new("getent").args(&["passwd", &user]).output().ok() {
+        let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+        let fields: Vec<&str> = stdout.split(":").collect();
+        facts.insert(String::from("uid"), String::from(fields[2]));
+        facts.insert(String::from("gid"), String::from(fields[3]));
+        facts.insert(String::from("full_name"), String::from(fields[4]));
+        facts.insert(String::from("home_dir"), String::from(fields[5]));
+    }
+}
 
-fn sys_exit(ctx: Context) -> ! {
+pub fn format_cmd<I>(cmd: I) -> String
+  where I: IntoIterator<Item = String>
+{
+    cmd.into_iter().map(|s| { if s.contains(" ") { format!("\"{}\"", s) } else { s.to_owned() } }).collect::<Vec<String>>().join(" ")
+}
+
+type BuiltIn = fn(Context);
+type TaskSpawner = fn(src: Context, ctx_step: Context) -> Result<(), TaskError>;
+
+fn sys_exit(ctx: Context) {
     std::process::exit(if let Ok(exit_code) = ctx.unpack("exit_code") { exit_code } else { 0 });
 }
 
-fn sys_shell(ctx: Context) -> ! {
+fn sys_shell(ctx: Context) {
     if let Some(ctx_docker) = ctx.subcontext("docker") {
         if let Some(CtxObj::Array(bash_cmd)) = ctx.get("bash") {
-            let cmd = spawner::format_cmd(bash_cmd.iter().map(|arg| {
+            let cmd = format_cmd(bash_cmd.iter().map(|arg| {
                 match arg {
                     CtxObj::Str(s) => s.to_owned(),
                     _ => String::from("")
                 }
             }));
-            match spawner::docker_start(ctx_docker, &["bash", "-c", &cmd]) {
+            match container::docker_start(ctx_docker, &["bash", "-c", &cmd]) {
                 Ok(_) => {
                     std::process::exit(SUCCESS);
                 },
@@ -86,7 +97,7 @@ fn sys_shell(ctx: Context) -> ! {
         }
         else {
             warn!("{}", "Just a bash shell. Here goes nothing.".purple());
-            match spawner::docker_start(ctx_docker.set("interactive", CtxObj::Bool(true)), &["bash"]) {
+            match container::docker_start(ctx_docker.set("interactive", CtxObj::Bool(true)), &["bash"]) {
                 Ok(_) => {
                     std::process::exit(SUCCESS);
                 },
@@ -103,7 +114,6 @@ fn sys_shell(ctx: Context) -> ! {
     }
 }
 
-pub mod spawner;
 fn invoke(src: Context, ctx_step: Context) {
     let ref action: String = ctx_step.unpack("action").unwrap();
     let ref src_path_str: String = src.unpack("src").unwrap();
@@ -114,15 +124,15 @@ fn invoke(src: Context, ctx_step: Context) {
     if let Some(ext_os) = src_path.extension() {
         let ext = ext_os.to_str().unwrap();
         #[allow(unused_variables)]
-        let wrapper = |whichever: JobSpawner| -> Result<(), Option<String>> {
+        let wrapper = |whichever: TaskSpawner| -> Result<(), Option<String>> {
             let last_words;
             println!("{}", "== Output =======================".blue());
             last_words = if let Err(e) = whichever(src, ctx_step) {
                 match e.src {
-                    JobErrorSource::NixError(_) | JobErrorSource::ExitCode(_) | JobErrorSource::Signal(_) => {
+                    TaskErrorSource::NixError(_) | TaskErrorSource::ExitCode(_) | TaskErrorSource::Signal(_) => {
                         Err(Some(format!("{}", e)))
                     },
-                    JobErrorSource::Internal => Err(None)
+                    TaskErrorSource::Internal => Err(None)
                 }
             }
             else { Ok(()) };
@@ -130,15 +140,15 @@ fn invoke(src: Context, ctx_step: Context) {
             return last_words;
         };
         let ret: Result<(), Option<String>> = match ext {
-            #[cfg(feature = "spawner_python")]
-            "py" => wrapper(spawner::invoke_py),
+            #[cfg(feature = "lang_python")]
+            "py" => wrapper(lang::python::invoke),
             _ => Err(Some(format!("It is not clear how to run {}.", src_path_str)))
         };
         if let Err(last_words) = ret {
             if let Some(msg) = last_words {
                 error!("{}", msg);
             }
-            std::process::exit(ERR_JOB);
+            std::process::exit(ERR_TASK);
         }
     }
     else {
@@ -246,16 +256,16 @@ fn run_step(ctx_step: Context) {
                                     resume_params.push(String::from("-v"));
                                 }
                             }
-                            match spawner::docker_start(ctx_docker.clone(), resume_params) {
+                            match container::docker_start(ctx_docker.clone(), resume_params) {
                                 Ok(_docker_cmd) => {},
                                 Err(e) => {
                                     match e.src {
-                                        JobErrorSource::NixError(_) | JobErrorSource::ExitCode(_) | JobErrorSource::Signal(_) => {
+                                        TaskErrorSource::NixError(_) | TaskErrorSource::ExitCode(_) | TaskErrorSource::Signal(_) => {
                                             error!("{}: {}", "Container has crashed".red().bold(), e);
                                         },
-                                        JobErrorSource::Internal => ()
+                                        TaskErrorSource::Internal => ()
                                     }
-                                    std::process::exit(ERR_JOB);
+                                    std::process::exit(ERR_TASK);
                                 }
                             }
                         }
@@ -316,7 +326,7 @@ pub fn run_yaml<P: AsRef<Path>>(playbook: P, ctx_args: Context) -> Result<(), st
         debug!("ctx({}) =\n{}", "partial".dimmed(), ctx_partial);
         if let Some(CtxObj::Str(_)) = ctx_partial.get("docker-step") {
             run_step(
-                if let Some(ctx_docker) = ctx_partial.subcontext("docker").unwrap().subcontext("docker_overrides") {
+                if let Some(ctx_docker) = ctx_partial.subcontext("docker").unwrap().subcontext("vars") {
                     ctx_partial.overlay(&ctx_docker).hide("docker")
                 }
                 else { ctx_partial.hide("docker") });

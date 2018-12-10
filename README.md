@@ -62,7 +62,7 @@ steps:
   action: say_hi
   docker:
     image: aleozlx/playbook-hello
-    docker_overrides:
+    vars:
       whoami: Container
 - name: Running on host
   action: say_hi
@@ -131,7 +131,7 @@ docker overrides > step context > global context
 ## How to specify docker environment?
 
 You may add a default docker environment.
-And use `docker_overrides` to change context variables when docker is in use.
+And use `vars` to change context variables when docker is in use.
 ```yml
 docker:
   image: aleozlx/tkstack2:latest
@@ -142,7 +142,7 @@ docker:
   volumes:
     - /tmp:/workspace/build
     - /mnt/datasets:/workspace/datasets
-  docker_overrides:
+  vars:
     storage: /workspace/datasets
 steps:
   - name: Some message here
@@ -163,7 +163,7 @@ steps:
       runtime: nvidia
       volumes:
         - /tmp:/workspace/build
-    docker_overrides:
+    vars:
         storage: /workspace/datasets
 ```
 

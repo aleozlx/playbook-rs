@@ -7,6 +7,6 @@ steps:
   action: say_hi
   docker:
     image: aleozlx/playbook-hello:0.2.5
-    docker_overrides:
+    vars:
       whoami: Container
 

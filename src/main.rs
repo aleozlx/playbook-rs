@@ -55,7 +55,7 @@ fn main() {
         });
     let mut playbook = Path::new(args.value_of("PLAYBOOK").unwrap()).to_path_buf();
     if let Some(_) = ctx_args.get("docker-step") {
-        if !playbook_api::inside_docker() {
+        if !playbook_api::container::inside_docker() {
             error!("Context error: Not inside of a Docker container.");
             std::process::exit(playbook_api::ERR_APP);
         }

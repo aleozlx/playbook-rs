@@ -12,8 +12,8 @@ name = "playbook_api"
 
 [features]
 base = []
-default = ["spawner_python"]
-spawner_python = ["pyo3", "ymlctx/topyobject"]
+default = ["lang_python"]
+lang_python = ["pyo3", "ymlctx/topyobject"]
 ci_flag = [] # dummy feature because of https://github.com/rust-lang/rust/issues/45599
 
 [dependencies]

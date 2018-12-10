@@ -32,9 +32,8 @@ mod test_containers {
     #[test]
     #[should_panic]
     fn docker_startn0(){
-        let scratch = get_scratch();
         let ctx_docker = Context::new();
-        match playbook_api::spawner::docker_start(ctx_docker, &["true"]) {
+        match playbook_api::container::docker_start(ctx_docker, &["true"]) {
             Ok(_docker_cmd) => { }
             Err(e) => { panic!("{}", e); }
         }
@@ -42,10 +41,9 @@ mod test_containers {
 
     #[test]
     fn docker_start00(){
-        let scratch = get_scratch();
         let ctx_docker = Context::new()
             .set("image", CtxObj::Str(String::from("aleozlx/playbook-test1")));
-        match playbook_api::spawner::docker_start(ctx_docker, &["true"]) {
+        match playbook_api::container::docker_start(ctx_docker, &["true"]) {
             Ok(_docker_cmd) => { }
             Err(e) => { panic!("{}", e); }
         }
@@ -58,7 +56,7 @@ mod test_containers {
             .set("image", CtxObj::Str(String::from("aleozlx/playbook-test1")))
             .set("volumes", CtxObj::Array(vec![CtxObj::Str(format!("{}:/scratch:rw", scratch.path().to_str().unwrap()))]))
             .set("interactive", CtxObj::Bool(false));
-        match playbook_api::spawner::docker_start(ctx_docker, &["bash", "-c", "echo Hello World > /scratch/output.txt"]) {
+        match playbook_api::container::docker_start(ctx_docker, &["bash", "-c", "echo Hello World > /scratch/output.txt"]) {
             Ok(_docker_cmd) => {
                 let output = get_output(&scratch, "output.txt");
                 assert_eq!(output, String::from("Hello World\n"));
@@ -75,7 +73,7 @@ mod test_containers {
             .set("volumes", CtxObj::Array(vec![CtxObj::Str(format!("{}:/scratch:rw", scratch.path().to_str().unwrap()))]))
             .set("impersonate", CtxObj::Str(String::from("dynamic")))
             .set("interactive", CtxObj::Bool(false));
-        match playbook_api::spawner::docker_start(ctx_docker, &["--docker-step", "0", "tests/test1/say_hi.yml"]) {
+        match playbook_api::container::docker_start(ctx_docker, &["--docker-step", "0", "tests/test1/say_hi.yml"]) {
             Ok(_docker_cmd) => {
                 let output = get_output(&scratch, "output.txt");
                 assert_eq!(output, String::from("Hello World\n"));
