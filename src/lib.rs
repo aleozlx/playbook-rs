@@ -117,15 +117,18 @@ fn sys_shell(ctx: Context) {
 fn invoke(src: Context, ctx_step: Context) {
     let ref action: String = ctx_step.unpack("action").unwrap();
     let ref src_path_str: String = src.unpack("src").unwrap();
-    eprintln!("{}", "== Context ======================".cyan());
-    eprintln!("# ctx({}@{}) =\n{}", action.cyan(), src_path_str.dimmed(), ctx_step);
-    eprintln!("{}", "== EOF ==========================".cyan());
+    if !cfg!(feature = "ci_only") {
+        eprintln!("{}", "== Context ======================".cyan());
+        eprintln!("# ctx({}@{}) =\n{}", action.cyan(), src_path_str.dimmed(), ctx_step);
+        eprintln!("{}", "== EOF ==========================".cyan());
+    }
     let src_path = Path::new(src_path_str);
     if let Some(ext_os) = src_path.extension() {
         let ext = ext_os.to_str().unwrap();
         #[allow(unused_variables)]
         let wrapper = |whichever: TaskSpawner| -> Result<(), Option<String>> {
             let last_words;
+            #[cfg(not(feature = "ci_only"))]
             println!("{}", "== Output =======================".blue());
             last_words = if let Err(e) = whichever(src, ctx_step) {
                 match e.src {
@@ -136,6 +139,7 @@ fn invoke(src: Context, ctx_step: Context) {
                 }
             }
             else { Ok(()) };
+            #[cfg(not(feature = "ci_only"))]
             println!("{}", "== EOF ==========================".blue());
             return last_words;
         };
@@ -246,14 +250,14 @@ fn run_step(ctx_step: Context) {
                                 format!("--docker-step={}", i_step),
                                 ctx_step.unpack("playbook").unwrap()
                             ];
-                            let relocate_unpack = ctx_step.unpack::<String>("relocate");
+                            let relocate_unpack = ctx_step.unpack("relocate");
                             if let Ok(relocate) = relocate_unpack {
                                 resume_params.push(relocate);
                             }
-                            let verbose_unpack = ctx_step.unpack::<i64>("verbose-fern");
+                            let verbose_unpack = ctx_step.unpack("verbose-fern");
                             if let Ok(verbose) = verbose_unpack {
                                 if verbose > 0 {
-                                    resume_params.push(String::from("-v"));
+                                    resume_params.push(format!("-{}", "v".repeat(verbose)));
                                 }
                             }
                             match container::docker_start(ctx_docker.clone(), resume_params) {
@@ -281,9 +285,11 @@ fn run_step(ctx_step: Context) {
                     (_, Some(sys_func)) => {
                         let ctx_sys = ctx_step.hide("whitelist").hide("i_step");
                         info!("{}: {}", "Built-in".magenta(), action);
-                        eprintln!("{}", "== Context ======================".cyan());
-                        eprintln!("# ctx({}) =\n{}", action.cyan(), ctx_sys);
-                        eprintln!("{}", "== EOF ==========================".cyan());
+                        if !cfg!(feature = "ci_only") {
+                            eprintln!("{}", "== Context ======================".cyan());
+                            eprintln!("# ctx({}) =\n{}", action.cyan(), ctx_sys);
+                            eprintln!("{}", "== EOF ==========================".cyan());
+                        }
                         sys_func(ctx_sys);
                     },
                     (Some(_), None) => {
@@ -304,9 +310,11 @@ fn run_step(ctx_step: Context) {
             (Some(action), Some(sys_func)) => {
                 let ctx_sys = ctx_step.hide("whitelist").hide("i_step");
                 info!("{}: {}", "Built-in".magenta(), action);
-                eprintln!("{}", "== Context ======================".cyan());
-                eprintln!("# ctx({}) =\n{}", action.cyan(), ctx_sys);
-                eprintln!("{}", "== EOF ==========================".cyan());
+                if !cfg!(feature = "ci_only") {
+                    eprintln!("{}", "== Context ======================".cyan());
+                    eprintln!("# ctx({}) =\n{}", action.cyan(), ctx_sys);
+                    eprintln!("{}", "== EOF ==========================".cyan());
+                }
                 sys_func(ctx_sys);
             },
             (Some(action), None) => {

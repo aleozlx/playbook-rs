@@ -6,15 +6,15 @@ cache: cargo
 matrix:
   include:
   - rust: stable
-    env: FEATURES="--no-default-features --features base"
+    env: FEATURES="--no-default-features --features base,ci_only"
   - rust: beta
-    env: FEATURES="--no-default-features --features base"
+    env: FEATURES="--no-default-features --features base,ci_only"
   - rust: nightly
-    env: FEATURES="--no-default-features --features base"
+    env: FEATURES="--no-default-features --features base,ci_only"
   # support different python versions? https://github.com/PyO3/pyo3/blob/master/.travis.yml
 before_install:
+- docker pull aleozlx/playbook-test1
 - docker build -t aleozlx/playbook-test1 tests/test1
-# - docker pull aleozlx/playbook-test1
 # - sudo apt-get update
 # - sudo apt-get install -y python3 python3-dev
 # - sudo ln -sf /usr/bin/python3 /usr/bin/python
