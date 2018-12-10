@@ -10,4 +10,4 @@ RUN wget -P /tmp --quiet https://static.rust-lang.org/rustup/dist/x86_64-unknown
 
 # Install the dev version of playbook-rs
 RUN ln -sf /usr/bin/python3 /usr/bin/python
-RUN /root/.cargo/bin/cargo install --git https://github.com/aleozlx/playbook-rs.git --branch dev && ln -s /root/.cargo/bin/playbook /usr/bin/playbook #001
+RUN /root/.cargo/bin/cargo install --git https://github.com/aleozlx/playbook-rs.git --branch dev && ln -s /root/.cargo/bin/playbook /usr/bin/playbook #002
