@@ -81,11 +81,11 @@ pub fn docker_start<I, S>(ctx_docker: Context, cmd: I) -> Result<String, JobErro
 {
     let username;
     let output = std::process::Command::new("id").output().unwrap();
-    let mut stdout = String::from_utf8_lossy(&output.stdout).into_owned();
-    let newline_len = stdout.trim_right().len();
-    stdout.truncate(newline_len);
+    let mut id_stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+    let newline_len = id_stdout.trim_right().len();
+    id_stdout.truncate(newline_len);
     let rule = Regex::new(r"^uid=(?P<uid>[0-9]+)(\((?P<user>\w+)\))? gid=(?P<gid>[0-9]+)(\((?P<group>\w+)\))?").unwrap();
-    if let Some(caps) = rule.captures(&stdout) {
+    if let Some(caps) = rule.captures(&id_stdout) {
         username = caps.name("user").unwrap().as_str().to_owned();
     }
     else {
@@ -119,8 +119,6 @@ pub fn docker_start<I, S>(ctx_docker: Context, cmd: I) -> Result<String, JobErro
     docker_run.push(format!("{}:{}/current-ro:ro", std::env::current_dir().unwrap().to_str().unwrap(), &home));
     docker_run.push(String::from("-w"));
     docker_run.push(format!("{}/current-ro", &home));
-    docker_run.push(String::from("-e"));
-    docker_run.push(format!("TKSTACK_USER={}", &stdout));
     if let Some(CtxObj::Array(volumes)) = ctx_docker.get("volumes") {
         for v in volumes {
             if let CtxObj::Str(vol) = v {
@@ -157,6 +155,16 @@ pub fn docker_start<I, S>(ctx_docker: Context, cmd: I) -> Result<String, JobErro
                 docker_run.push(String::from("-e"));
                 docker_run.push(var.to_owned());
             }
+        }
+    }
+    if let Some(CtxObj::Str(impersonate)) = ctx_docker.get("impersonate") {
+        if impersonate == "dynamic" {
+            docker_run.push(String::from("-e"));
+            docker_run.push(format!("TKSTACK_USER={}", &id_stdout));
+        }
+        else {
+            docker_run.push(String::from("-u"));
+            docker_run.push(username.to_owned());
         }
     }
     if let Some(CtxObj::Str(name)) = ctx_docker.get("name") {
