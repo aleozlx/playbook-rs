@@ -1,0 +1,9 @@
+---
+whitelist:
+- src: say_hi.py
+message: Hello World
+steps:
+- name: Running in a container
+  action: say_hi
+  docker:
+    image: aleozlx/playbook-test1

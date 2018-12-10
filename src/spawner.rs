@@ -159,8 +159,12 @@ pub fn docker_start<I, S>(ctx_docker: Context, cmd: I) -> Result<String, JobErro
             docker_run.push(String::from("--cap-add=SETUID"));
             docker_run.push(String::from("--cap-add=SETGID"));
             docker_run.push(String::from("--cap-add=CHOWN")); // TODO possibility to restrict this?
+            docker_run.push(String::from("-u"));
+            docker_run.push(String::from("root"));
             docker_run.push(String::from("-e"));
             docker_run.push(format!("TKSTACK_USER={}", &id_stdout));
+            docker_run.push(String::from("--entrypoint"));
+            docker_run.push(String::from("/usr/bin/playbook"));
         }
         else {
             docker_run.push(String::from("-u"));

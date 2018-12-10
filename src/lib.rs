@@ -233,8 +233,6 @@ fn run_step(ctx_step: Context) {
                         if let Some(CtxObj::Str(image_name)) = ctx_docker.get("image") {
                             info!("Entering Docker: {}", image_name.purple());
                             let mut resume_params = vec! [
-                                // String::from("/usr/bin/env"),
-                                // String::from("playbook"),
                                 format!("--docker-step={}", i_step),
                                 ctx_step.unpack("playbook").unwrap()
                             ];
