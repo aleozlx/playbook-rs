@@ -105,9 +105,6 @@ pub fn docker_start<I, S>(ctx_docker: Context, cmd: I) -> Result<String, JobErro
     }
     docker_run.push(String::from("--cap-drop=ALL"));
     docker_run.push(String::from("--cap-add=MKNOD"));
-    docker_run.push(String::from("--cap-add=SETUID"));
-    docker_run.push(String::from("--cap-add=SETGID"));
-    docker_run.push(String::from("--cap-add=CHOWN")); // TODO possibility to restrict this?
     if let Some(CtxObj::Str(runtime)) = ctx_docker.get("runtime") {
         docker_run.push(format!("--runtime={}", runtime));
     }
@@ -159,13 +156,20 @@ pub fn docker_start<I, S>(ctx_docker: Context, cmd: I) -> Result<String, JobErro
     }
     if let Some(CtxObj::Str(impersonate)) = ctx_docker.get("impersonate") {
         if impersonate == "dynamic" {
+            docker_run.push(String::from("--cap-add=SETUID"));
+            docker_run.push(String::from("--cap-add=SETGID"));
+            docker_run.push(String::from("--cap-add=CHOWN")); // TODO possibility to restrict this?
             docker_run.push(String::from("-e"));
             docker_run.push(format!("TKSTACK_USER={}", &id_stdout));
         }
         else {
             docker_run.push(String::from("-u"));
-            docker_run.push(username.to_owned());
+            docker_run.push(impersonate.to_owned());
         }
+    }
+    else {
+        docker_run.push(String::from("-u"));
+        docker_run.push(format!("{}:{}", userinfo["uid"], userinfo["gid"]));
     }
     if let Some(CtxObj::Str(name)) = ctx_docker.get("name") {
         docker_run.push(format!("--name={}", name));
@@ -179,7 +183,7 @@ pub fn docker_start<I, S>(ctx_docker: Context, cmd: I) -> Result<String, JobErro
     docker_run.extend::<Vec<String>>(cmd.into_iter().map(|s| {s.as_ref().to_str().unwrap().to_owned()}).collect());
     let docker_cmd = format_cmd(docker_run.clone());
     info!("{}", &docker_cmd);
-    #[cfg(test)] // Let's see the docker command during testing.
+    #[cfg(feature = "ci_flag")] // Let's see the docker command during testing.
     println!("{}", &docker_cmd);
     let docker_linux: Vec<CString> = docker_run.iter().map(|s| {CString::new(s as &str).unwrap()}).collect();
     match fork() {
