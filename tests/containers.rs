@@ -35,7 +35,7 @@ mod test_containers {
         let ctx_docker = Context::new()
             .set("image", CtxObj::Str(String::from("aleozlx/playbook-test1"))) // TODO use impersonate to mod the image
             .set("volumes", CtxObj::Array(vec![CtxObj::Str(format!("{}:/scratch:rw", scratch.path().to_str().unwrap()))]));
-        match playbook_api::spawner::docker_start(ctx_docker, &["echo Hello World > /scratch/output.txt"]) {
+        match playbook_api::spawner::docker_start(ctx_docker, &["bash", "-c", "id && echo Hello World > /scratch/output.txt"]) {
             Ok(_docker_cmd) => {
                 let output = get_output(&scratch, "output.txt");
                 assert_eq!(output, String::from("Hello World\n"));
