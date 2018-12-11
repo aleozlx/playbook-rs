@@ -1,7 +1,7 @@
 # playbook-rs
 
-[![master](https://travis-ci.org/aleozlx/playbook-rs.svg?branch=master)](https://travis-ci.org/aleozlx/playbook-rs)
-[![nightly](https://travis-ci.org/aleozlx/playbook-rs.svg?branch=dev)](https://travis-ci.org/aleozlx/playbook-rs)
+[![Build Status](https://img.shields.io/travis/aleozlx/playbook-rs.svg?style=flat-square&label=master)](https://travis-ci.org/aleozlx/playbook-rs)
+[![Build Status](https://img.shields.io/travis/aleozlx/playbook-rs/dev.svg?style=flat-square&label=nightly)](https://travis-ci.org/aleozlx/playbook-rs)
 
 YAML driven Docker DevOps
 
