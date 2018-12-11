@@ -98,7 +98,8 @@ fn sys_shell(ctx: Context) {
                     _ => String::from("")
                 }
             }));
-            match container::docker_start(ctx_docker, &["bash", "-c", &cmd]) {
+            match container::docker_start(ctx_docker.hide("impersonate"), &["bash", "-c", &cmd]) {
+                // Note: it is not secure to transition from the playbook to a shell, so "dynamic" impersonate is not an option
                 Ok(_) => {
                     exit(ExitCode::Success);
                 },
@@ -110,7 +111,7 @@ fn sys_shell(ctx: Context) {
         }
         else {
             warn!("{}", "Just a bash shell. Here goes nothing.".purple());
-            match container::docker_start(ctx_docker.set("interactive", CtxObj::Bool(true)), &["bash"]) {
+            match container::docker_start(ctx_docker.set("interactive", CtxObj::Bool(true)).hide("impersonate"), &["bash"]) {
                 Ok(_) => {
                     exit(ExitCode::Success);
                 },

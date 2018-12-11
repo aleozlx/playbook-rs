@@ -43,11 +43,11 @@ playbook say_hi.yml
 * Designed to work with `nvidia-docker2` and operationalize very complex GPU workflows
 * Language agnostic symbol namespace (notice the `whitelist` and `#[playbook(say_hi)]`)
 * Static/dynamic impersonation (setuid and optionally create&reference host user) to ensure correct privileges
-* Internal security hardening by allowing a small subset of super user capabilities
-  * SETUID, SETGID, CHOWN, MKNOD
-* X11 Graphics `gui: ture`
-* Support specifying IPC and (TODO network) namespace
+* Internal security hardening by whitelisting a small subset of super user capabilities
+  * SETUID, SETGID, CHOWN
+* X11 Graphics by setting `gui: ture`
 * Each step can run in a different container (or on host) to support imcompatible dependencies in the same workflow
+* Support specifying IPC and (TODO network) namespace
 * Simple step function API: `awesome_func(ctx)`
 * Minimal command line arguments to launch a workflow: `playbook some.yml`
 * Colorful logging for readability

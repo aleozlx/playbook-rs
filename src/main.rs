@@ -43,7 +43,7 @@ fn main() {
         (about: crate_description!())
         (@arg DOCKER_STEP: --("docker-step") +takes_value "For playbook-rs use ONLY: indicator that we have entered a container")
         (@arg RELOCATE: --relocate +takes_value "Relocation of the playbook inside docker, required when using abs. path")
-        (@arg VERBOSE: --verbose -v "Debug log")
+        (@arg VERBOSE: --verbose -v ... "Log verbosity")
         (@arg PLAYBOOK: +required "YAML playbook")
     ).get_matches();
     setup_logger(args.occurrences_of("VERBOSE")).expect("Logger Error.");
