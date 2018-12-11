@@ -12,9 +12,9 @@ name = "playbook_api"
 
 [features]
 base = []
-default = ["spawner_python"]
-spawner_python = ["pyo3", "ymlctx/topyobject"]
-ci_flag = [] # dummy feature because of https://github.com/rust-lang/rust/issues/45599
+default = ["lang_python"]
+lang_python = ["pyo3", "ymlctx/topyobject"]
+ci_only = [] # dummy feature because of https://github.com/rust-lang/rust/issues/45599
 
 [dependencies]
 yaml-rust = "^0.4"
@@ -27,7 +27,9 @@ ymlctx = "0.1.2"
 pyo3 = { version = "0.5", optional = true }
 regex = "1"
 nix = "^0.11"
-impersonate = { git = "https://github.com/aleozlx/impersonate.git", branch = "master" }
+# impersonate = { git = "https://github.com/aleozlx/impersonate.git", branch = "master" }
+impersonate = "0.0.3"
+dirs = "1.0.4"
 
 [dev-dependencies]
 tempfile = "3.0.5"

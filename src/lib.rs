@@ -8,7 +8,7 @@ extern crate regex;
 extern crate nix;
 extern crate impersonate;
 
-#[cfg(feature = "spawner_python")]
+#[cfg(feature = "lang_python")]
 extern crate pyo3;
 
 use std::str;
@@ -16,30 +16,37 @@ use std::path::Path;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
+use std::collections::HashMap;
 use std::result::Result;
 use std::collections::HashSet;
 use yaml_rust::{Yaml, YamlLoader};
 use colored::*;
 use regex::Regex;
 pub use ymlctx::context::{Context, CtxObj};
+pub mod container;
+pub mod lang;
 
-pub const SUCCESS: i32 = 0;
-pub const ERR_SYS: i32 = 1;
-pub const ERR_APP: i32 = 2;
-pub const ERR_YML: i32 = 3;
-pub const ERR_JOB: i32 = 4;
+pub enum ExitCode {
+    Success,
+    ErrSys,
+    ErrApp,
+    ErrYML,
+    ErrTask
+}
 
-pub fn inside_docker() -> bool {
-    let status = std::process::Command::new("grep").args(&["-q", "docker", "/proc/1/cgroup"])
-        .status().expect("I/O error");
-    match status.code() {
-        Some(code) => code==0,
-        None => unreachable!()
-    }
+pub fn exit(code: ExitCode) -> ! {
+    // Any clean up?
+    std::process::exit(match code {
+        ExitCode::Success => 0,
+        ExitCode::ErrSys => 1,
+        ExitCode::ErrApp => 2,
+        ExitCode::ErrYML => 3,
+        ExitCode::ErrTask => 4
+    })
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum JobErrorSource {
+pub enum TaskErrorSource {
     NixError(nix::Error),
     ExitCode(i32),
     Signal(nix::sys::signal::Signal),
@@ -47,98 +54,118 @@ pub enum JobErrorSource {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct JobError {
+pub struct TaskError {
     msg: String,
-    src: JobErrorSource
+    src: TaskErrorSource
 }
 
-impl std::fmt::Display for JobError {
+impl std::fmt::Display for TaskError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", &self.msg)
     }
 }
 
-type BuiltIn = fn(Context) -> !;
-type JobSpawner = fn(src: Context, ctx_step: Context) -> Result<(), JobError>;
+pub fn copy_user_info(facts: &mut HashMap<String, String>, user: &str) {
+    if let Some(output) = std::process::Command::new("getent").args(&["passwd", &user]).output().ok() {
+        let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+        let fields: Vec<&str> = stdout.split(":").collect();
+        facts.insert(String::from("uid"), String::from(fields[2]));
+        facts.insert(String::from("gid"), String::from(fields[3]));
+        facts.insert(String::from("full_name"), String::from(fields[4]));
+        facts.insert(String::from("home_dir"), String::from(fields[5]));
+    }
+}
 
-fn sys_exit(ctx: Context) -> ! {
+pub fn format_cmd<I>(cmd: I) -> String
+  where I: IntoIterator<Item = String>
+{
+    cmd.into_iter().map(|s| { if s.contains(" ") { format!("\"{}\"", s) } else { s.to_owned() } }).collect::<Vec<String>>().join(" ")
+}
+
+type BuiltIn = fn(Context);
+type TaskSpawner = fn(src: Context, ctx_step: Context) -> Result<(), TaskError>;
+
+fn sys_exit(ctx: Context) {
     std::process::exit(if let Ok(exit_code) = ctx.unpack("exit_code") { exit_code } else { 0 });
 }
 
-fn sys_shell(ctx: Context) -> ! {
+fn sys_shell(ctx: Context) {
     if let Some(ctx_docker) = ctx.subcontext("docker") {
         if let Some(CtxObj::Array(bash_cmd)) = ctx.get("bash") {
-            let cmd = spawner::format_cmd(bash_cmd.iter().map(|arg| {
+            let cmd = format_cmd(bash_cmd.iter().map(|arg| {
                 match arg {
                     CtxObj::Str(s) => s.to_owned(),
                     _ => String::from("")
                 }
             }));
-            match spawner::docker_start(ctx_docker, &["bash", "-c", &cmd]) {
+            match container::docker_start(ctx_docker, &["bash", "-c", &cmd]) {
                 Ok(_) => {
-                    std::process::exit(SUCCESS);
+                    exit(ExitCode::Success);
                 },
                 Err(_) => {
                     error!("Docker crashed.");
-                    std::process::exit(ERR_YML);
+                    exit(ExitCode::ErrYML);
                 }
             }
         }
         else {
             warn!("{}", "Just a bash shell. Here goes nothing.".purple());
-            match spawner::docker_start(ctx_docker.set("interactive", CtxObj::Bool(true)), &["bash"]) {
+            match container::docker_start(ctx_docker.set("interactive", CtxObj::Bool(true)), &["bash"]) {
                 Ok(_) => {
-                    std::process::exit(SUCCESS);
+                    exit(ExitCode::Success);
                 },
                 Err(_) => {
                     error!("Docker crashed.");
-                    std::process::exit(ERR_YML);
+                    exit(ExitCode::ErrYML);
                 }
             }
         }
     }
     else {
         error!("Docker context not found!");
-        std::process::exit(ERR_YML);
+        exit(ExitCode::ErrYML);
     }
 }
 
-pub mod spawner;
 fn invoke(src: Context, ctx_step: Context) {
     let ref action: String = ctx_step.unpack("action").unwrap();
     let ref src_path_str: String = src.unpack("src").unwrap();
-    eprintln!("{}", "== Context ======================".cyan());
-    eprintln!("# ctx({}@{}) =\n{}", action.cyan(), src_path_str.dimmed(), ctx_step);
-    eprintln!("{}", "== EOF ==========================".cyan());
+    if !cfg!(feature = "ci_only") {
+        eprintln!("{}", "== Context ======================".cyan());
+        eprintln!("# ctx({}@{}) =\n{}", action.cyan(), src_path_str.dimmed(), ctx_step);
+        eprintln!("{}", "== EOF ==========================".cyan());
+    }
     let src_path = Path::new(src_path_str);
     if let Some(ext_os) = src_path.extension() {
         let ext = ext_os.to_str().unwrap();
         #[allow(unused_variables)]
-        let wrapper = |whichever: JobSpawner| -> Result<(), Option<String>> {
+        let wrapper = |whichever: TaskSpawner| -> Result<(), Option<String>> {
             let last_words;
+            #[cfg(not(feature = "ci_only"))]
             println!("{}", "== Output =======================".blue());
             last_words = if let Err(e) = whichever(src, ctx_step) {
                 match e.src {
-                    JobErrorSource::NixError(_) | JobErrorSource::ExitCode(_) | JobErrorSource::Signal(_) => {
+                    TaskErrorSource::NixError(_) | TaskErrorSource::ExitCode(_) | TaskErrorSource::Signal(_) => {
                         Err(Some(format!("{}", e)))
                     },
-                    JobErrorSource::Internal => Err(None)
+                    TaskErrorSource::Internal => Err(None)
                 }
             }
             else { Ok(()) };
+            #[cfg(not(feature = "ci_only"))]
             println!("{}", "== EOF ==========================".blue());
             return last_words;
         };
         let ret: Result<(), Option<String>> = match ext {
-            #[cfg(feature = "spawner_python")]
-            "py" => wrapper(spawner::invoke_py),
+            #[cfg(feature = "lang_python")]
+            "py" => wrapper(lang::python::invoke),
             _ => Err(Some(format!("It is not clear how to run {}.", src_path_str)))
         };
         if let Err(last_words) = ret {
             if let Some(msg) = last_words {
                 error!("{}", msg);
             }
-            std::process::exit(ERR_JOB);
+            exit(ExitCode::ErrTask);
         }
     }
     else {
@@ -236,26 +263,26 @@ fn run_step(ctx_step: Context) {
                                 format!("--docker-step={}", i_step),
                                 ctx_step.unpack("playbook").unwrap()
                             ];
-                            let relocate_unpack = ctx_step.unpack::<String>("relocate");
+                            let relocate_unpack = ctx_step.unpack("relocate");
                             if let Ok(relocate) = relocate_unpack {
                                 resume_params.push(relocate);
                             }
-                            let verbose_unpack = ctx_step.unpack::<i64>("verbose-fern");
+                            let verbose_unpack = ctx_step.unpack("verbose-fern");
                             if let Ok(verbose) = verbose_unpack {
                                 if verbose > 0 {
-                                    resume_params.push(String::from("-v"));
+                                    resume_params.push(format!("-{}", "v".repeat(verbose)));
                                 }
                             }
-                            match spawner::docker_start(ctx_docker.clone(), resume_params) {
+                            match container::docker_start(ctx_docker.clone(), resume_params) {
                                 Ok(_docker_cmd) => {},
                                 Err(e) => {
                                     match e.src {
-                                        JobErrorSource::NixError(_) | JobErrorSource::ExitCode(_) | JobErrorSource::Signal(_) => {
+                                        TaskErrorSource::NixError(_) | TaskErrorSource::ExitCode(_) | TaskErrorSource::Signal(_) => {
                                             error!("{}: {}", "Container has crashed".red().bold(), e);
                                         },
-                                        JobErrorSource::Internal => ()
+                                        TaskErrorSource::Internal => ()
                                     }
-                                    std::process::exit(ERR_JOB);
+                                    exit(ExitCode::ErrTask);
                                 }
                             }
                         }
@@ -271,21 +298,23 @@ fn run_step(ctx_step: Context) {
                     (_, Some(sys_func)) => {
                         let ctx_sys = ctx_step.hide("whitelist").hide("i_step");
                         info!("{}: {}", "Built-in".magenta(), action);
-                        eprintln!("{}", "== Context ======================".cyan());
-                        eprintln!("# ctx({}) =\n{}", action.cyan(), ctx_sys);
-                        eprintln!("{}", "== EOF ==========================".cyan());
+                        if !cfg!(feature = "ci_only") {
+                            eprintln!("{}", "== Context ======================".cyan());
+                            eprintln!("# ctx({}) =\n{}", action.cyan(), ctx_sys);
+                            eprintln!("{}", "== EOF ==========================".cyan());
+                        }
                         sys_func(ctx_sys);
                     },
                     (Some(_), None) => {
                         error!("Action not recognized: {}", action);
-                        std::process::exit(ERR_YML);
+                        exit(ExitCode::ErrYML);
                     },
                     (None, None) => unreachable!()
                 }
             },
             (None, None) => {
                 error!("Syntax Error: Key `action` must be a string.");
-                std::process::exit(ERR_YML);
+                exit(ExitCode::ErrYML);
             }
         }
     }
@@ -294,18 +323,20 @@ fn run_step(ctx_step: Context) {
             (Some(action), Some(sys_func)) => {
                 let ctx_sys = ctx_step.hide("whitelist").hide("i_step");
                 info!("{}: {}", "Built-in".magenta(), action);
-                eprintln!("{}", "== Context ======================".cyan());
-                eprintln!("# ctx({}) =\n{}", action.cyan(), ctx_sys);
-                eprintln!("{}", "== EOF ==========================".cyan());
+                if !cfg!(feature = "ci_only") {
+                    eprintln!("{}", "== Context ======================".cyan());
+                    eprintln!("# ctx({}) =\n{}", action.cyan(), ctx_sys);
+                    eprintln!("{}", "== EOF ==========================".cyan());
+                }
                 sys_func(ctx_sys);
             },
             (Some(action), None) => {
                 error!("Action not recognized: {}", action);
-                std::process::exit(ERR_YML);
+                exit(ExitCode::ErrYML);
             },
             (None, _) => {
                 error!("Syntax Error: Key `whitelist` should be a list of mappings.");
-                std::process::exit(ERR_YML);
+                exit(ExitCode::ErrYML);
             }
         }
     }    
@@ -316,7 +347,7 @@ pub fn run_yaml<P: AsRef<Path>>(playbook: P, ctx_args: Context) -> Result<(), st
         debug!("ctx({}) =\n{}", "partial".dimmed(), ctx_partial);
         if let Some(CtxObj::Str(_)) = ctx_partial.get("docker-step") {
             run_step(
-                if let Some(ctx_docker) = ctx_partial.subcontext("docker").unwrap().subcontext("docker_overrides") {
+                if let Some(ctx_docker) = ctx_partial.subcontext("docker").unwrap().subcontext("vars") {
                     ctx_partial.overlay(&ctx_docker).hide("docker")
                 }
                 else { ctx_partial.hide("docker") });
@@ -336,9 +367,9 @@ pub fn run_yaml<P: AsRef<Path>>(playbook: P, ctx_args: Context) -> Result<(), st
             }
             else {
                 error!("Syntax Error: Cannot parse the `--docker-step` flag.");
-                std::process::exit(ERR_APP);
+                exit(ExitCode::ErrApp);
             }
-            std::process::exit(SUCCESS);
+            exit(ExitCode::Success);
         }
         for (i_step, ctx_step) in steps.iter().enumerate() {
             let ctx_partial = ctx_global.overlay(&ctx_step).overlay(&ctx_args);
@@ -354,7 +385,7 @@ pub fn run_yaml<P: AsRef<Path>>(playbook: P, ctx_args: Context) -> Result<(), st
         }
         else {
             error!("Syntax Error: Key `steps` is not an array.");
-            std::process::exit(ERR_YML);
+            exit(ExitCode::ErrYML);
         }
     };
 
@@ -372,7 +403,7 @@ pub fn run_yaml<P: AsRef<Path>>(playbook: P, ctx_args: Context) -> Result<(), st
         Ok(yml_global) => { enter_global(&yml_global[0]); },
         Err(e) => {
             error!("{}: {}", e, "Some YAML parsing error has occurred.");
-            std::process::exit(ERR_YML);
+            exit(ExitCode::ErrYML);
         }
     }
     Ok(())

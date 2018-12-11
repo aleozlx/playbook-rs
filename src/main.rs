@@ -3,15 +3,17 @@ extern crate clap;
 
 #[macro_use]
 extern crate log;
-
+extern crate dirs;
 extern crate fern;
 extern crate chrono;
 
 extern crate playbook_api;
 use std::path::Path;
-use playbook_api::{Context, CtxObj};
+use playbook_api::{Context, CtxObj, ExitCode};
 
-fn setup_logger(verbose: bool) -> Result<(), fern::InitError> {
+fn setup_logger(verbose: u64) -> Result<(), fern::InitError> {
+    let ref log_dir = dirs::home_dir().expect("Cannot determine the HOME directory.").join(".playbook-rs");
+    if !Path::new(log_dir).exists() { std::fs::create_dir(log_dir)?; }
     fern::Dispatch::new()
         .format(|out, message, record| {
             out.finish(format_args!(
@@ -21,7 +23,14 @@ fn setup_logger(verbose: bool) -> Result<(), fern::InitError> {
                 message
             ))
         })
-        .level(if verbose {log::LevelFilter::Debug} else {log::LevelFilter::Info})
+        .level(match verbose {
+            0 => log::LevelFilter::Warn,
+            1 => log::LevelFilter::Info,
+            2 => log::LevelFilter::Debug,
+            3 => log::LevelFilter::Trace,
+            _ => log::LevelFilter::Trace
+        })
+        .chain(fern::log_file(log_dir.join("playbook.log"))?)
         .chain(std::io::stderr())
         .apply()?;
     Ok(())
@@ -37,10 +46,7 @@ fn main() {
         (@arg VERBOSE: --verbose -v "Debug log")
         (@arg PLAYBOOK: +required "YAML playbook")
     ).get_matches();
-    match args.occurrences_of("VERBOSE") {
-        0 => setup_logger(false),
-        _ => setup_logger(true)
-    }.unwrap();
+    setup_logger(args.occurrences_of("VERBOSE")).expect("Logger Error.");
     fn _helper(opt: Option<&str>) -> Option<CtxObj> {
         if let Some(s) = opt { Some(CtxObj::Str(s.to_owned())) }
         else { None }
@@ -55,9 +61,9 @@ fn main() {
         });
     let mut playbook = Path::new(args.value_of("PLAYBOOK").unwrap()).to_path_buf();
     if let Some(_) = ctx_args.get("docker-step") {
-        if !playbook_api::inside_docker() {
+        if !playbook_api::container::inside_docker() {
             error!("Context error: Not inside of a Docker container.");
-            std::process::exit(playbook_api::ERR_APP);
+            playbook_api::exit(ExitCode::ErrApp);
         }
         // * Related issue: https://github.com/aleozlx/playbook-rs/issues/6
         if let Some(relocate) = args.value_of("RELOCATE") {
@@ -69,7 +75,7 @@ fn main() {
                 Ok(()) => (),
                 Err(e) => {
                     error!("{}", e);
-                    std::process::exit(playbook_api::ERR_SYS);
+                    playbook_api::exit(ExitCode::ErrSys);
                 }
             }
         }
@@ -78,10 +84,12 @@ fn main() {
         Ok(()) => (),
         Err(e) => {
             error!("{}: {}", e, playbook.display());
-            std::process::exit(playbook_api::ERR_SYS);
+            playbook_api::exit(ExitCode::ErrSys);
         }
     }
 }
+
+
 
 // extern "C" {
 //     fn signal(sig: u32, cb: extern fn(u32)) -> extern fn(u32);
