@@ -6,19 +6,16 @@ cache: cargo
 matrix:
   include:
   - rust: stable
-    env: FEATURES="--no-default-features --features base,ci_only"
+    env: FEATURES="--no-default-features --features base,ci_only" GUEST_FEATURES="ci_only"
   - rust: beta
-    env: FEATURES="--no-default-features --features base,ci_only"
+    env: FEATURES="--no-default-features --features base,ci_only" GUEST_FEATURES="ci_only"
   - rust: nightly
-    env: FEATURES="--no-default-features --features base,ci_only"
-  # support different python versions? https://github.com/PyO3/pyo3/blob/master/.travis.yml
+    env: FEATURES="--no-default-features --features base,ci_only" GUEST_FEATURES="ci_only"
+  - rust: stable
+    env: FEATURES="--no-default-features --features base,ci_only" GUEST_FEATURES="ci_only,lang_python"
 before_install:
-- docker pull aleozlx/playbook-test1
-- docker build -t aleozlx/playbook-test1 tests/test1
-# - sudo apt-get update
-# - sudo apt-get install -y python3 python3-dev
-# - sudo ln -sf /usr/bin/python3 /usr/bin/python
+- docker pull aleozlx/playbook-test:base
+- docker build -t aleozlx/playbook-test:test1 --build-arg GUEST_FEATURES=${GUEST_FEATURES} tests/test1
 script:
-- echo === Tavis User == $(id) ====
 - cargo build ${FEATURES}
 - cargo test ${FEATURES}
