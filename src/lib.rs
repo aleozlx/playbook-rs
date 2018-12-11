@@ -26,11 +26,24 @@ pub use ymlctx::context::{Context, CtxObj};
 pub mod container;
 pub mod lang;
 
-pub const SUCCESS: i32 = 0;
-pub const ERR_SYS: i32 = 1;
-pub const ERR_APP: i32 = 2;
-pub const ERR_YML: i32 = 3;
-pub const ERR_TASK: i32 = 4;
+pub enum ExitCode {
+    Success,
+    ErrSys,
+    ErrApp,
+    ErrYML,
+    ErrTask
+}
+
+fn exit(code: ExitCode) -> ! {
+    // Any clean up?
+    std::process::exit(match code {
+        ExitCode::Success => 0,
+        ExitCode::ErrSys => 1,
+        ExitCode::ErrApp => 2,
+        ExitCode::ErrYML => 3,
+        ExitCode::ErrTask => 4
+    })
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TaskErrorSource {
@@ -87,11 +100,11 @@ fn sys_shell(ctx: Context) {
             }));
             match container::docker_start(ctx_docker, &["bash", "-c", &cmd]) {
                 Ok(_) => {
-                    std::process::exit(SUCCESS);
+                    exit(ExitCode::Success);
                 },
                 Err(_) => {
                     error!("Docker crashed.");
-                    std::process::exit(ERR_YML);
+                    exit(ExitCode::ErrYML);
                 }
             }
         }
@@ -99,18 +112,18 @@ fn sys_shell(ctx: Context) {
             warn!("{}", "Just a bash shell. Here goes nothing.".purple());
             match container::docker_start(ctx_docker.set("interactive", CtxObj::Bool(true)), &["bash"]) {
                 Ok(_) => {
-                    std::process::exit(SUCCESS);
+                    exit(ExitCode::Success);
                 },
                 Err(_) => {
                     error!("Docker crashed.");
-                    std::process::exit(ERR_YML);
+                    exit(ExitCode::ErrYML);
                 }
             }
         }
     }
     else {
         error!("Docker context not found!");
-        std::process::exit(ERR_YML);
+        exit(ExitCode::ErrYML);
     }
 }
 
@@ -152,7 +165,7 @@ fn invoke(src: Context, ctx_step: Context) {
             if let Some(msg) = last_words {
                 error!("{}", msg);
             }
-            std::process::exit(ERR_TASK);
+            exit(ExitCode::ErrTask);
         }
     }
     else {
@@ -269,7 +282,7 @@ fn run_step(ctx_step: Context) {
                                         },
                                         TaskErrorSource::Internal => ()
                                     }
-                                    std::process::exit(ERR_TASK);
+                                    exit(ExitCode::ErrTask);
                                 }
                             }
                         }
@@ -294,14 +307,14 @@ fn run_step(ctx_step: Context) {
                     },
                     (Some(_), None) => {
                         error!("Action not recognized: {}", action);
-                        std::process::exit(ERR_YML);
+                        exit(ExitCode::ErrYML);
                     },
                     (None, None) => unreachable!()
                 }
             },
             (None, None) => {
                 error!("Syntax Error: Key `action` must be a string.");
-                std::process::exit(ERR_YML);
+                exit(ExitCode::ErrYML);
             }
         }
     }
@@ -319,11 +332,11 @@ fn run_step(ctx_step: Context) {
             },
             (Some(action), None) => {
                 error!("Action not recognized: {}", action);
-                std::process::exit(ERR_YML);
+                exit(ExitCode::ErrYML);
             },
             (None, _) => {
                 error!("Syntax Error: Key `whitelist` should be a list of mappings.");
-                std::process::exit(ERR_YML);
+                exit(ExitCode::ErrYML);
             }
         }
     }    
@@ -354,9 +367,9 @@ pub fn run_yaml<P: AsRef<Path>>(playbook: P, ctx_args: Context) -> Result<(), st
             }
             else {
                 error!("Syntax Error: Cannot parse the `--docker-step` flag.");
-                std::process::exit(ERR_APP);
+                exit(ExitCode::ErrApp);
             }
-            std::process::exit(SUCCESS);
+            exit(ExitCode::Success);
         }
         for (i_step, ctx_step) in steps.iter().enumerate() {
             let ctx_partial = ctx_global.overlay(&ctx_step).overlay(&ctx_args);
@@ -372,7 +385,7 @@ pub fn run_yaml<P: AsRef<Path>>(playbook: P, ctx_args: Context) -> Result<(), st
         }
         else {
             error!("Syntax Error: Key `steps` is not an array.");
-            std::process::exit(ERR_YML);
+            exit(ExitCode::ErrYML);
         }
     };
 
@@ -390,7 +403,7 @@ pub fn run_yaml<P: AsRef<Path>>(playbook: P, ctx_args: Context) -> Result<(), st
         Ok(yml_global) => { enter_global(&yml_global[0]); },
         Err(e) => {
             error!("{}: {}", e, "Some YAML parsing error has occurred.");
-            std::process::exit(ERR_YML);
+            exit(ExitCode::ErrYML);
         }
     }
     Ok(())
