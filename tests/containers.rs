@@ -42,7 +42,7 @@ mod test_containers {
     #[test]
     fn docker_start00(){
         let ctx_docker = Context::new()
-            .set("image", CtxObj::Str(String::from("aleozlx/playbook-test1")));
+            .set("image", CtxObj::Str(String::from("aleozlx/playbook-test:test1")));
         match playbook_api::container::docker_start(ctx_docker, &["true"]) {
             Ok(_docker_cmd) => { }
             Err(e) => { panic!("{}", e); }
@@ -53,7 +53,7 @@ mod test_containers {
     fn docker_start01(){
         let scratch = get_scratch();
         let ctx_docker = Context::new()
-            .set("image", CtxObj::Str(String::from("aleozlx/playbook-test1")))
+            .set("image", CtxObj::Str(String::from("aleozlx/playbook-test:test1")))
             .set("volumes", CtxObj::Array(vec![CtxObj::Str(format!("{}:/scratch:rw", scratch.path().to_str().unwrap()))]))
             .set("interactive", CtxObj::Bool(false));
         match playbook_api::container::docker_start(ctx_docker, &["bash", "-c", "echo Hello World > /scratch/output.txt"]) {
@@ -69,7 +69,7 @@ mod test_containers {
     fn docker_start02(){
         let scratch = get_scratch();
         let ctx_docker = Context::new()
-            .set("image", CtxObj::Str(String::from("aleozlx/playbook-test1")))
+            .set("image", CtxObj::Str(String::from("aleozlx/playbook-test:test1")))
             .set("volumes", CtxObj::Array(vec![CtxObj::Str(format!("{}:/scratch:rw", scratch.path().to_str().unwrap()))]))
             .set("impersonate", CtxObj::Str(String::from("dynamic")))
             .set("interactive", CtxObj::Bool(false));
