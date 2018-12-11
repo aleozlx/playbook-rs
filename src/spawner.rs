@@ -140,6 +140,7 @@ pub fn docker_start<I, S>(ctx_docker: Context, cmd: I) -> Result<String, JobErro
     }
     if let Some(CtxObj::Bool(gui)) = ctx_docker.get("gui") {
         if *gui {
+            // TODO verify permissions
             docker_run.extend::<Vec<String>>([
                 "--net=host", "-e", "DISPLAY", "-v", "/tmp/.X11-unix:/tmp/.X11-unix:rw",
                 "-v", &format!("{}/.Xauthority:{}/.Xauthority:ro", userinfo["home_dir"], home), 
