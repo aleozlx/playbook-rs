@@ -34,4 +34,4 @@ dirs = "1.0.4"
 tempfile = "3.0.5"
 
 [badges]
-travis-ci = { repository = "...", branch = "master" }
+travis-ci = { repository = "aleozlx/playbook-rs", branch = "master" }

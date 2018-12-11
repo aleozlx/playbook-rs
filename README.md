@@ -47,7 +47,7 @@ playbook say_hi.yml
   * SETUID, SETGID, CHOWN
 * X11 Graphics by setting `gui: ture`
 * Each step can run in a different container (or on host) to support imcompatible dependencies in the same workflow
-* Support specifying IPC and (TODO network) namespace
+* Support specifying IPC and network namespace
 * Simple step function API: `awesome_func(ctx)`
 * Minimal command line arguments to launch a workflow: `playbook some.yml`
 * Colorful logging for readability
