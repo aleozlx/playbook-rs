@@ -34,7 +34,7 @@ pub enum ExitCode {
     ErrTask
 }
 
-fn exit(code: ExitCode) -> ! {
+pub fn exit(code: ExitCode) -> ! {
     // Any clean up?
     std::process::exit(match code {
         ExitCode::Success => 0,

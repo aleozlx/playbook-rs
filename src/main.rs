@@ -9,7 +9,7 @@ extern crate chrono;
 
 extern crate playbook_api;
 use std::path::Path;
-use playbook_api::{Context, CtxObj};
+use playbook_api::{Context, CtxObj, ExitCode};
 
 fn setup_logger(verbose: u64) -> Result<(), fern::InitError> {
     let ref log_dir = dirs::home_dir().expect("Cannot determine the HOME directory.").join(".playbook-rs");
@@ -63,7 +63,7 @@ fn main() {
     if let Some(_) = ctx_args.get("docker-step") {
         if !playbook_api::container::inside_docker() {
             error!("Context error: Not inside of a Docker container.");
-            std::process::exit(playbook_api::ERR_APP);
+            playbook_api::exit(ExitCode::ErrApp);
         }
         // * Related issue: https://github.com/aleozlx/playbook-rs/issues/6
         if let Some(relocate) = args.value_of("RELOCATE") {
@@ -75,7 +75,7 @@ fn main() {
                 Ok(()) => (),
                 Err(e) => {
                     error!("{}", e);
-                    std::process::exit(playbook_api::ERR_SYS);
+                    playbook_api::exit(ExitCode::ErrSys);
                 }
             }
         }
@@ -84,10 +84,12 @@ fn main() {
         Ok(()) => (),
         Err(e) => {
             error!("{}: {}", e, playbook.display());
-            std::process::exit(playbook_api::ERR_SYS);
+            playbook_api::exit(ExitCode::ErrSys);
         }
     }
 }
+
+
 
 // extern "C" {
 //     fn signal(sig: u32, cb: extern fn(u32)) -> extern fn(u32);
