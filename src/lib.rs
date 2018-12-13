@@ -80,7 +80,7 @@ fn read_contents<P: AsRef<Path>>(fname: P) -> Result<String, std::io::Error> {
     let mut contents = String::new();
     let mut file = File::open(fname)?;
     file.read_to_string(&mut contents)?;
-    return contents;
+    return Ok(contents);
 }
 
 pub fn format_cmd<I>(cmd: I) -> String
@@ -350,53 +350,53 @@ fn run_step(ctx_step: Context) {
     }    
 }
 
-pub fn run_yaml<P: AsRef<Path>>(playbook: P, ctx_args: Context) -> Result<(), std::io::Error> {
-    let enter_partial = |ctx_partial: Context| {
-        debug!("ctx({}) =\n{}", "partial".dimmed(), ctx_partial);
-        if let Some(CtxObj::Str(_)) = ctx_partial.get("docker-step") {
-            run_step(
-                if let Some(ctx_docker) = ctx_partial.subcontext("docker").unwrap().subcontext("vars") {
-                    ctx_partial.overlay(&ctx_docker).hide("docker")
-                }
-                else { ctx_partial.hide("docker") });
-        }
-        else {
-            run_step(ctx_partial);
-        }
-    };
-    
-    let enter_steps = |steps: Vec<Context>, ctx_global: Context| {
-        if let Some(CtxObj::Str(i_step_str)) = ctx_args.get("docker-step") {
-            // ^^ Then we must be in a docker container because main() has guaranteed that.
-            if let Ok(i_step) = i_step_str.parse::<usize>() {
-                let ctx_step = steps[i_step].clone();
-                let ctx_partial = ctx_global.overlay(&ctx_step).overlay(&ctx_args);
-                enter_partial(ctx_partial.set("i_step", CtxObj::Int(i_step as i64)));
+fn enter_partial(ctx_partial: Context) {
+    debug!("ctx({}) =\n{}", "partial".dimmed(), ctx_partial);
+    if let Some(CtxObj::Str(_)) = ctx_partial.get("docker-step") {
+        run_step(
+            if let Some(ctx_docker) = ctx_partial.subcontext("docker").unwrap().subcontext("vars") {
+                ctx_partial.overlay(&ctx_docker).hide("docker")
             }
-            else {
-                error!("Syntax Error: Cannot parse the `--docker-step` flag.");
-                exit(ExitCode::ErrApp);
-            }
-            exit(ExitCode::Success);
-        }
-        for (i_step, ctx_step) in steps.iter().enumerate() {
+            else { ctx_partial.hide("docker") });
+    }
+    else {
+        run_step(ctx_partial);
+    }
+}
+
+fn enter_steps(steps: Vec<Context>, ctx_global: Context, ctx_args: Context) {
+    if let Some(CtxObj::Str(i_step_str)) = ctx_args.get("docker-step") {
+        // ^^ Then we must be in a docker container because main() has guaranteed that.
+        if let Ok(i_step) = i_step_str.parse::<usize>() {
+            let ctx_step = steps[i_step].clone();
             let ctx_partial = ctx_global.overlay(&ctx_step).overlay(&ctx_args);
             enter_partial(ctx_partial.set("i_step", CtxObj::Int(i_step as i64)));
         }
-    };
-
-    let enter_global = |yml_global: &Yaml| {
-        let raw = Context::from(yml_global.to_owned());
-        let ctx_global = raw.hide("steps");
-        if let Some(steps) = raw.list_contexts("steps") {
-            enter_steps(steps, ctx_global);
-        }
         else {
-            error!("Syntax Error: Key `steps` is not an array.");
-            exit(ExitCode::ErrYML);
+            error!("Syntax Error: Cannot parse the `--docker-step` flag.");
+            exit(ExitCode::ErrApp);
         }
-    };
+        exit(ExitCode::Success);
+    }
+    for (i_step, ctx_step) in steps.iter().enumerate() {
+        let ctx_partial = ctx_global.overlay(&ctx_step).overlay(&ctx_args);
+        enter_partial(ctx_partial.set("i_step", CtxObj::Int(i_step as i64)));
+    }
+}
 
+fn enter_global(yml_global: &Yaml, ctx_args: Context) {
+    let raw = Context::from(yml_global.to_owned());
+    let ctx_global = raw.hide("steps");
+    if let Some(steps) = raw.list_contexts("steps") {
+        enter_steps(steps, ctx_global, ctx_args);
+    }
+    else {
+        error!("Syntax Error: Key `steps` is not an array.");
+        exit(ExitCode::ErrYML);
+    }
+}
+
+pub fn run_yaml<P: AsRef<Path>>(playbook: P, ctx_args: Context) -> Result<(), std::io::Error> {
     let fname = playbook.as_ref();
     if let Some(playbook_ext) = fname.extension() {
         if playbook_ext != "yml" && playbook_ext != "yaml" {
@@ -405,7 +405,7 @@ pub fn run_yaml<P: AsRef<Path>>(playbook: P, ctx_args: Context) -> Result<(), st
     }
     let contents = read_contents(fname)?;
     match YamlLoader::load_from_str(&contents) {
-        Ok(yml_global) => { enter_global(&yml_global[0]); },
+        Ok(yml_global) => { enter_global(&yml_global[0], ctx_args); },
         Err(e) => {
             error!("{}: {}", e, "Some YAML parsing error has occurred.");
             exit(ExitCode::ErrYML);
