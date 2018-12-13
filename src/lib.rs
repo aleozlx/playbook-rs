@@ -76,6 +76,13 @@ pub fn copy_user_info(facts: &mut HashMap<String, String>, user: &str) {
     }
 }
 
+fn read_contents<P: AsRef<Path>>(fname: P) -> Result<String, std::io::Error> {
+    let mut contents = String::new();
+    let mut file = File::open(fname)?;
+    file.read_to_string(&mut contents)?;
+    return contents;
+}
+
 pub fn format_cmd<I>(cmd: I) -> String
   where I: IntoIterator<Item = String>
 {
@@ -396,10 +403,7 @@ pub fn run_yaml<P: AsRef<Path>>(playbook: P, ctx_args: Context) -> Result<(), st
             warn!("{}", "The playbook file is not YAML based on its extension.".yellow());
         }
     }
-    let mut file = File::open(fname)?;
-    let mut contents = String::new();
-    file.read_to_string(&mut contents)?;
-    
+    let contents = read_contents(fname)?;
     match YamlLoader::load_from_str(&contents) {
         Ok(yml_global) => { enter_global(&yml_global[0]); },
         Err(e) => {
