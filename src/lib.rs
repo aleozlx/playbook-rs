@@ -135,6 +135,15 @@ fn sys_shell(ctx: Context) {
     }
 }
 
+fn sys_fork(ctx: Context) {
+    if let Some(rc) = ctx.subcontext("resource") {
+
+    }
+    else {
+
+    }
+}
+
 fn invoke(src: Context, ctx_step: Context) {
     let ref action: String = ctx_step.unpack("action").unwrap();
     let ref src_path_str: String = src.unpack("src").unwrap();
