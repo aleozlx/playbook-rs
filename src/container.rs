@@ -45,13 +45,17 @@ pub fn docker_start<I, S>(ctx_docker: Context, cmd: I) -> Result<String, TaskErr
         docker_run.push(String::from("-it"));
     }
     docker_run.push(String::from("--cap-drop=ALL"));
-    docker_run.push(String::from("--cap-add=MKNOD"));
+    //docker_run.push(String::from("--cap-add=MKNOD"));
     if let Some(CtxObj::Str(runtime)) = ctx_docker.get("runtime") {
         docker_run.push(format!("--runtime={}", runtime));
     }
     if let Some(CtxObj::Str(ipc_namespace)) = ctx_docker.get("ipc") {
         docker_run.push(String::from("--ipc"));
         docker_run.push(ipc_namespace.to_owned());
+    }
+    if let Some(CtxObj::Str(net_namespace)) = ctx_docker.get("network") {
+        docker_run.push(String::from("--network"));
+        docker_run.push(net_namespace.to_owned());
     }
     docker_run.push(String::from("-v"));
     docker_run.push(format!("{}:{}/current-ro:ro", std::env::current_dir().unwrap().to_str().unwrap(), &home));
@@ -81,8 +85,9 @@ pub fn docker_start<I, S>(ctx_docker: Context, cmd: I) -> Result<String, TaskErr
     }
     if let Some(CtxObj::Bool(gui)) = ctx_docker.get("gui") {
         if *gui {
+            // TODO verify permissions
             docker_run.extend::<Vec<String>>([
-                "--net=host", "-e", "DISPLAY", "-v", "/tmp/.X11-unix:/tmp/.X11-unix:rw",
+                "--network", "host", "-e", "DISPLAY", "-v", "/tmp/.X11-unix:/tmp/.X11-unix:rw",
                 "-v", &format!("{}/.Xauthority:{}/.Xauthority:ro", userinfo["home_dir"], home), 
             ].iter().map(|&s| {s.to_owned()}).collect());
         }

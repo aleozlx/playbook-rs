@@ -1,7 +1,10 @@
 # playbook-rs
 
-[![master](https://travis-ci.org/aleozlx/playbook-rs.svg?branch=master)](https://travis-ci.org/aleozlx/playbook-rs)
-[![nightly](https://travis-ci.org/aleozlx/playbook-rs.svg?branch=dev)](https://travis-ci.org/aleozlx/playbook-rs)
+[![Build Status](https://img.shields.io/travis/aleozlx/playbook-rs/master.svg?style=flat-square&label=master)](https://travis-ci.org/aleozlx/playbook-rs)
+[![Build Status](https://img.shields.io/travis/aleozlx/playbook-rs/dev.svg?style=flat-square&label=nightly)](https://travis-ci.org/aleozlx/playbook-rs)
+[![CI Base Image](https://img.shields.io/docker/automated/aleozlx/playbook-test.svg?style=flat-square)](https://hub.docker.com/r/aleozlx/playbook-test/tags/)
+[![Version](https://img.shields.io/crates/v/playbook.svg?style=flat-square)](https://hub.docker.com/r/aleozlx/playbook-test/tags/)
+
 
 YAML driven Docker DevOps
 
@@ -40,11 +43,11 @@ playbook say_hi.yml
 * Designed to work with `nvidia-docker2` and operationalize very complex GPU workflows
 * Language agnostic symbol namespace (notice the `whitelist` and `#[playbook(say_hi)]`)
 * Static/dynamic impersonation (setuid and optionally create&reference host user) to ensure correct privileges
-* Internal security hardening by allowing a small subset of super user capabilities
-  * SETUID, SETGID, CHOWN, MKNOD
-* X11 Graphics `gui: ture`
-* Support specifying IPC and (TODO network) namespace
+* Internal security hardening by whitelisting a small subset of super user capabilities
+  * SETUID, SETGID, CHOWN
+* X11 Graphics by setting `gui: ture`
 * Each step can run in a different container (or on host) to support imcompatible dependencies in the same workflow
+* Support specifying IPC and (TODO network) namespace
 * Simple step function API: `awesome_func(ctx)`
 * Minimal command line arguments to launch a workflow: `playbook some.yml`
 * Colorful logging for readability
