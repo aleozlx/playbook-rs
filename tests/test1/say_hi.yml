@@ -1,12 +1,9 @@
 ---
 whitelist:
 - src: say_hi.py
-whoami: Host
+message: Hello World
 steps:
 - name: Running in a container
   action: say_hi
   docker:
-    image: aleozlx/playbook-hello:0.2.5
-    vars:
-      whoami: Container
-
+    image: aleozlx/playbook-test1
