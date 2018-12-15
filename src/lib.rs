@@ -98,19 +98,10 @@ enum TransientContext {
     Diverging(ExitCode)
 }
 
-impl TransientContext {
-    // pub fn stateful(x: Result<Context, ExitCode>) -> TransientContext {
-    //     match x {
-    //         Ok(v) => TransientContext::Stateful(v),
-    //         Err(e) => TransientContext::Diverging(e)
-    //     }
-    // }
-
-    fn stateless(x: Result<Context, ExitCode>) -> TransientContext {
-        match x {
-            Ok(v) => TransientContext::Stateless(v),
-            Err(e) => TransientContext::Diverging(e)
-        }
+fn assume_stateless(x: Result<Context, ExitCode>) -> TransientContext {
+    match x {
+        Ok(v) => TransientContext::Stateless(v),
+        Err(e) => TransientContext::Diverging(e)
     }
 }
 
@@ -382,7 +373,7 @@ fn run_step(ctx_step: Context) -> TransientContext {
                 };
                 if let Some(CtxObj::Str(_)) = ctx_step.get("arg-resume") {
                     show_step(true);
-                    TransientContext::stateless(invoke(ctx_source, ctx_step.hide("whitelist").hide("i_step")))
+                    assume_stateless(invoke(ctx_source, ctx_step.hide("whitelist").hide("i_step")))
                 }
                 else {
                     if let Some(ctx_docker) = ctx_step.subcontext("docker") {
@@ -405,7 +396,7 @@ fn run_step(ctx_step: Context) -> TransientContext {
                             }
                             match container::docker_start(ctx_docker.clone(), resume_params) {
                                 Ok(_docker_cmd) => {
-                                    TransientContext::stateless(Ok(Context::new())) // TODO pass return value back as a context
+                                    assume_stateless(Ok(Context::new())) // TODO pass return value back as a context
                                 },
                                 Err(e) => {
                                     match e.src {
@@ -425,7 +416,7 @@ fn run_step(ctx_step: Context) -> TransientContext {
                     }
                     else {
                         show_step(true);
-                        TransientContext::stateless(invoke(ctx_source, ctx_step.hide("whitelist").hide("i_step")))
+                        assume_stateless(invoke(ctx_source, ctx_step.hide("whitelist").hide("i_step")))
                     }
                 }
             },
