@@ -108,7 +108,7 @@ pub fn docker_start<I, S>(ctx_docker: Context, cmd: I) -> Result<String, TaskErr
             docker_run.push(String::from("-u"));
             docker_run.push(String::from("root"));
             docker_run.push(String::from("-e"));
-            docker_run.push(format!("TKSTACK_USER={}", &id_stdout));
+            docker_run.push(format!("IMPERSONATE={}", &id_stdout));
             docker_run.push(String::from("--entrypoint"));
             docker_run.push(String::from("/usr/bin/playbook"));
         }

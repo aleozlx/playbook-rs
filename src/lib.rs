@@ -274,7 +274,7 @@ fn run_step(ctx_step: Context) -> Result<Context, ExitCode> {
                         info!("{}", if for_real { step_header } else { step_header.dimmed() });
                     }
                 };
-                if let Some(CtxObj::Str(_)) = ctx_step.get("docker-step") {
+                if let Some(CtxObj::Str(_)) = ctx_step.get("arg-resume") {
                     show_step(true);
                     invoke(ctx_source, ctx_step.hide("whitelist").hide("i_step"))
                 }
@@ -284,7 +284,7 @@ fn run_step(ctx_step: Context) -> Result<Context, ExitCode> {
                         if let Some(CtxObj::Str(image_name)) = ctx_docker.get("image") {
                             info!("Entering Docker: {}", image_name.purple());
                             let mut resume_params = vec! [
-                                format!("--docker-step={}", i_step),
+                                format!("--arg-resume={}", i_step),
                                 ctx_step.unpack("playbook").unwrap()
                             ];
                             let relocate_unpack = ctx_step.unpack("relocate");
@@ -375,7 +375,7 @@ fn run_step(ctx_step: Context) -> Result<Context, ExitCode> {
 fn deduce_context(ctx_step_raw: &Context, ctx_global: &Context, ctx_args: &Context, i_step: usize) -> Context {
     let ctx_partial = ctx_global.overlay(&ctx_step_raw).overlay(&ctx_args).set("i_step", CtxObj::Int(i_step as i64));
     debug!("ctx({}) =\n{}", "partial".dimmed(), ctx_partial);
-    if let Some(CtxObj::Str(_)) = ctx_partial.get("docker-step") {
+    if let Some(CtxObj::Str(_)) = ctx_partial.get("arg-resume") {
         if let Some(ctx_docker) = ctx_partial.subcontext("docker").unwrap().subcontext("vars") {
             ctx_partial.overlay(&ctx_docker).hide("docker")
         }
@@ -422,7 +422,7 @@ pub fn run_yaml<P: AsRef<Path>>(playbook: P, ctx_args: Context) -> Result<(), Ex
                     return Err(e);
                 }
             };
-            if let Some(CtxObj::Str(i_step_str)) = ctx_args.get("docker-step") { // TODO rename var (and arg) to "resume" in v0.4
+            if let Some(CtxObj::Str(i_step_str)) = ctx_args.get("arg-resume") {
                 // ^^ Then we must be in a docker container because main() has guaranteed that.
                 if let Ok(i_step) = i_step_str.parse::<usize>() {
                     let ctx_step = deduce_context(&steps[i_step], &ctx_global, &ctx_args, i_step);
@@ -432,7 +432,7 @@ pub fn run_yaml<P: AsRef<Path>>(playbook: P, ctx_args: Context) -> Result<(), Ex
                     }
                 }
                 else {
-                    error!("Syntax Error: Cannot parse the `--docker-step` flag.");
+                    error!("Syntax Error: Cannot parse the `--arg-resume` flag.");
                     Err(ExitCode::ErrApp)
                 }
             }

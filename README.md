@@ -86,12 +86,12 @@ Notice how the playbook driver spawns containers when necessary, and supply appr
 $ playbook say_hi.yml
 [2018-11-19 10:51:15] INFO Step 1: Running in a container
 [2018-11-19 10:51:15] INFO Entering Docker: aleozlx/playbook-hello
-[2018-11-19 10:51:15] INFO ["docker", "run", "--rm", "-t", "--net=host", "-v", "/home/alex/Code/playbook-rs/examples/hello:/home/alex/current-ro", "-w", "/home/alex/current-ro", "aleozlx/playbook-hello", "/usr/bin/env", "playbook", "--docker-step=0", "say_hi.yml"]
+[2018-11-19 10:51:15] INFO ["docker", "run", "--rm", "-t", "--net=host", "-v", "/home/alex/Code/playbook-rs/examples/hello:/home/alex/current-ro", "-w", "/home/alex/current-ro", "aleozlx/playbook-hello", "/usr/bin/env", "playbook", "--arg-resume=0", "say_hi.yml"]
 [2018-11-19 16:51:15] INFO Step 1: Running in a container
 == Context ======================
 # ctx(say_hi@say_hi.py) =
 ---
-docker-step: "0"
+arg-resume: "0"
 playbook: say_hi.yml
 whoami: Container
 name: Running in a container
