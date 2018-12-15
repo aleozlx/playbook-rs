@@ -9,7 +9,8 @@ extern crate chrono;
 
 extern crate playbook_api;
 use std::path::Path;
-use playbook_api::{Context, CtxObj, ExitCode};
+use playbook_api::{Context, CtxObj};
+use playbook_api::builtins::ExitCode;
 
 fn setup_logger(verbose: u64) -> Result<(), fern::InitError> {
     let ref log_dir = dirs::home_dir().expect("Cannot determine the HOME directory.").join(".playbook-rs");
@@ -99,9 +100,17 @@ fn main() {
             }
         }
     }
-    if let Err(e) = playbook_api::run_yaml(&playbook, ctx_args) {
-        exit(e);
-    }
+    match playbook_api::load_yaml(playbook) {
+        Ok(raw) => match playbook_api::run_playbook(raw, ctx_args) {
+            Ok(()) => { },
+            Err(e) => exit(e)
+        },
+        Err(e) => exit(e)
+    };
+
+    // if let Err(e) = playbook_api::run_yaml(&playbook, ctx_args) {
+    //     exit(e);
+    // }
 }
 
 fn clean_up() {

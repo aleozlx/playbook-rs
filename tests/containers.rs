@@ -81,4 +81,22 @@ mod test_containers {
             Err(e) => { panic!("{}", e); }
         }
     }
+
+    #[test]
+    fn full_play01(){
+        let scratch = get_scratch();
+        let raw = playbook_api::load_yaml("tests/test1/say_hi.yml").expect("Cannot load test playbook.");
+        let playbook = raw.set("docker", CtxObj::Context(raw.subcontext("docker").unwrap()
+            .set("volumes", CtxObj::Array(vec![CtxObj::Str(format!("{}:/scratch:rw", scratch.path().to_str().unwrap()))]))
+        ));
+        let ctx_args = Context::new()
+            .set("playbook", CtxObj::Str(String::from("tests/test1/say_hi.yml")));
+        match playbook_api::run_playbook(playbook, ctx_args) {
+            Ok(()) => {
+                let output = get_output(&scratch, "output.txt");
+                assert_eq!(output, String::from("Hello World\n"));
+            }
+            Err(e) => { panic!("Error: exit_code = {:?}", e); }
+        }
+    }
 }
