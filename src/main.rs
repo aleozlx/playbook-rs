@@ -63,7 +63,7 @@ fn main() {
     if let Some(_) = ctx_args.get("docker-step") {
         if !playbook_api::container::inside_docker() {
             error!("Context error: Not inside of a Docker container.");
-            playbook_api::exit(ExitCode::ErrApp);
+            exit(ExitCode::ErrApp);
         }
         // * Related issue: https://github.com/aleozlx/playbook-rs/issues/6
         if let Some(relocate) = args.value_of("RELOCATE") {
@@ -75,20 +75,24 @@ fn main() {
                 Ok(()) => (),
                 Err(e) => {
                     error!("{}", e);
-                    playbook_api::exit(ExitCode::ErrSys);
+                    exit(ExitCode::ErrSys);
                 }
             }
         }
     }
-    match playbook_api::run_yaml(&playbook, ctx_args) {
-        Ok(()) => (),
-        Err(e) => {
-            error!("{}: {}", e, playbook.display());
-            playbook_api::exit(ExitCode::ErrSys);
-        }
+    if let Err(e) = playbook_api::run_yaml(&playbook, ctx_args) {
+        exit(e);
     }
 }
 
+fn clean_up() {
+
+}
+
+fn exit(code: ExitCode) -> ! {
+    clean_up();
+    std::process::exit(code.into());
+}
 
 
 // extern "C" {
