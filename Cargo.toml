@@ -15,6 +15,7 @@ base = []
 default = ["lang_python"]
 lang_python = ["pyo3", "ymlctx/topyobject"]
 ci_only = [] # dummy feature because of https://github.com/rust-lang/rust/issues/45599
+agent = []
 
 [dependencies]
 yaml-rust = "^0.4"
