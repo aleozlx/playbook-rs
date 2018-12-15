@@ -1,0 +1,6 @@
+---
+docker:
+  image: nvidia/cuda
+  #runtime: nvidia
+steps:
+- action: sys_shell
