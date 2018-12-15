@@ -44,8 +44,8 @@ macro_rules! map_arg {
 }
 
 fn main() {
-    let args = if cfg!(features = "agent") {
-        clap_app!(playbook =>
+    #[cfg(feature = "agent")]
+    let args = clap_app!(playbook =>
             (version: crate_version!())
             (author: crate_authors!())
             (about: crate_description!())
@@ -54,18 +54,16 @@ fn main() {
             (@arg RELOCATE: --relocate +takes_value "Relocation of the playbook inside docker, required when using abs. path")
             (@arg VERBOSE: --verbose -v ... "Log verbosity")
             (@arg PLAYBOOK: +required "YAML playbook")
-        ).get_matches()
-    }
-    else {
-        clap_app!(playbook =>
+        ).get_matches();
+    #[cfg(not(feature = "agent"))]
+    let args = clap_app!(playbook =>
             (version: crate_version!())
             (author: crate_authors!())
             (about: crate_description!())
             (@arg RELOCATE: --relocate +takes_value "Relocation of the playbook inside docker, required when using abs. path")
             (@arg VERBOSE: --verbose -v ... "Log verbosity")
             (@arg PLAYBOOK: +required "YAML playbook")
-        ).get_matches()
-    };
+        ).get_matches();
     setup_logger(args.occurrences_of("VERBOSE")).expect("Logger Error.");
     if let Some(ver) = args.value_of("ASSERT_VER") {
         if ver != crate_version!() {
