@@ -1,0 +1,15 @@
+---
+whitelist:
+- src: say_hi.py
+docker:
+  image: aleozlx/playbook-test:test1
+  impersonate: dynamic
+  interactive: false
+message: Hello World
+steps:
+- name: Reload vars from an external file
+  action: sys_vars
+  states:
+    from: external_vars.yml
+- name: Running in a container
+  action: say_hi

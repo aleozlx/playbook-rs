@@ -45,7 +45,6 @@ pub fn docker_start<I, S>(ctx_docker: Context, cmd: I) -> Result<String, TaskErr
         docker_run.push(String::from("-it"));
     }
     docker_run.push(String::from("--cap-drop=ALL"));
-    //docker_run.push(String::from("--cap-add=MKNOD"));
     if let Some(CtxObj::Str(runtime)) = ctx_docker.get("runtime") {
         docker_run.push(format!("--runtime={}", runtime));
     }

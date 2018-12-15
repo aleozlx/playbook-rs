@@ -1,4 +1,5 @@
 use super::container;
+use std::path::Path;
 use colored::*;
 use yaml_rust::YamlLoader;
 use ymlctx::context::{Context, CtxObj};
@@ -154,7 +155,17 @@ fn vars(ctx: Context) -> TransientContext {
     if let Some(CtxObj::Context(ctx_states)) = ctx.get("states") {
         if let Some(CtxObj::Str(url)) = ctx_states.get("from") {
             // * may support both file & database in the future
-            let contents = match super::read_contents(url) {
+            let ref playbook: String = ctx.unpack("playbook").unwrap();
+            let playbook_dir;
+            if let Some(parent) = Path::new(playbook).parent() {
+                playbook_dir = parent;
+            }
+            else {
+                playbook_dir = Path::new(".");
+            }
+            let ref src_path = playbook_dir.join(url);
+
+            let contents = match super::read_contents(src_path) {
                 Ok(v) => v,
                 Err(e) => {
                     error!("IO Error: {}", e);
