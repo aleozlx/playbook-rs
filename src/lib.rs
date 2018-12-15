@@ -92,14 +92,54 @@ pub fn format_cmd<I>(cmd: I) -> String
     cmd.into_iter().map(|s| { if s.contains(" ") { format!("\"{}\"", s) } else { s.to_owned() } }).collect::<Vec<String>>().join(" ")
 }
 
-type BuiltIn = fn(Context) -> Result<Context, ExitCode>;
-type TaskSpawner = fn(src: Context, ctx_step: Context) -> Result<(), TaskError>;
-
-fn sys_exit(ctx: Context) -> Result<Context, ExitCode> {
-    Err(ExitCode::Any(if let Ok(exit_code) = ctx.unpack("exit_code") { exit_code } else { 0 }))
+enum TransientContext {
+    Stateful(Context),
+    Stateless(Context),
+    Diverging(ExitCode)
 }
 
-fn sys_shell(ctx: Context) -> Result<Context, ExitCode> {
+impl TransientContext {
+    // pub fn stateful(x: Result<Context, ExitCode>) -> TransientContext {
+    //     match x {
+    //         Ok(v) => TransientContext::Stateful(v),
+    //         Err(e) => TransientContext::Diverging(e)
+    //     }
+    // }
+
+    fn stateless(x: Result<Context, ExitCode>) -> TransientContext {
+        match x {
+            Ok(v) => TransientContext::Stateless(v),
+            Err(e) => TransientContext::Diverging(e)
+        }
+    }
+}
+
+type BuiltIn = fn(Context) -> TransientContext;
+type TaskSpawner = fn(src: Context, ctx_step: Context) -> Result<(), TaskError>;
+
+/// Exit
+/// 
+/// **Example(s)**
+/// ```yaml
+/// action: sys_exit
+/// ---
+/// action: sys_exit
+/// exit_code: 1
+/// ```
+fn sys_exit(ctx: Context) -> TransientContext {
+    TransientContext::Diverging(ExitCode::Any(if let Ok(exit_code) = ctx.unpack("exit_code") { exit_code } else { 0 }))
+}
+
+/// Enter a shell (this must be in a container context)
+/// 
+/// **Example(s)**
+/// ```yaml
+/// action: sys_shell
+/// ---
+/// action: sys_shell
+/// bash: ['echo', 'hi']
+/// ```
+fn sys_shell(ctx: Context) -> TransientContext {
     if let Some(ctx_docker) = ctx.subcontext("docker") {
         if let Some(CtxObj::Array(bash_cmd)) = ctx.get("bash") {
             let cmd = format_cmd(bash_cmd.iter().map(|arg| {
@@ -111,11 +151,11 @@ fn sys_shell(ctx: Context) -> Result<Context, ExitCode> {
             match container::docker_start(ctx_docker.hide("impersonate"), &["bash", "-c", &cmd]) {
                 // Note: it is not secure to transition from the playbook to a shell, so "dynamic" impersonate is not an option
                 Ok(_) => {
-                    Err(ExitCode::Success)
+                    TransientContext::Diverging(ExitCode::Success)
                 },
                 Err(_) => {
                     error!("Docker crashed.");
-                    Err(ExitCode::ErrYML)
+                    TransientContext::Diverging(ExitCode::ErrYML)
                 }
             }
         }
@@ -123,29 +163,71 @@ fn sys_shell(ctx: Context) -> Result<Context, ExitCode> {
             warn!("{}", "Just a bash shell. Here goes nothing.".purple());
             match container::docker_start(ctx_docker.set("interactive", CtxObj::Bool(true)).hide("impersonate"), &["bash"]) {
                 Ok(_) => {
-                    Err(ExitCode::Success)
+                    TransientContext::Diverging(ExitCode::Success)
                 },
                 Err(_) => {
                     error!("Docker crashed.");
-                    Err(ExitCode::ErrYML)
+                    TransientContext::Diverging(ExitCode::ErrYML)
                 }
             }
         }
     }
     else {
         error!("Docker context not found!");
-        Err(ExitCode::ErrYML)
+        TransientContext::Diverging(ExitCode::ErrYML)
     }
 }
 
-fn sys_fork(ctx: Context) -> Result<Context, ExitCode> {
+fn sys_fork(ctx: Context) -> TransientContext {
     if let Some(rc) = ctx.subcontext("resource") {
 
     }
     else {
 
     }
-    Err(ExitCode::ErrApp) // TODO
+    TransientContext::Diverging(ExitCode::ErrApp) // TODO
+}
+
+/// Dynamically import vars into the `ctx_states` context.
+/// This is the only system action that introduces statefulness to the entire operation.
+/// 
+/// **Example(s)**
+/// ```yaml
+/// action: sys_var
+/// states:
+///   from: pipe!
+/// ---
+/// action: sys_var
+/// states:
+///   from: another.yml
+/// ---
+/// action: sys_var
+/// states:
+///   from: postgresql://user:passwd@host/db
+/// ```
+fn sys_vars(ctx: Context) -> TransientContext {
+    if let Some(CtxObj::Context(ctx_states)) = ctx.get("states") {
+        if let Some(CtxObj::Str(url)) = ctx_states.get("from") {
+            // * may support both file & database in the future
+            let contents = match read_contents(url) {
+                Ok(v) => v,
+                Err(e) => {
+                    error!("IO Error: {}", e);
+                    return TransientContext::Diverging(ExitCode::ErrSys);
+                }
+            };
+            return match YamlLoader::load_from_str(&contents) {
+                Ok(yml_vars) => {
+                    let ctx_pipe = Context::from(yml_vars[0].to_owned());
+                    TransientContext::Stateful(ctx_pipe)
+                }
+                Err(_) => {
+                    TransientContext::Diverging(ExitCode::ErrYML)
+                }
+            };
+        }
+    }
+    TransientContext::Stateless(Context::new())
 }
 
 fn invoke(src: Context, ctx_step: Context) -> Result<Context, ExitCode> {
@@ -254,13 +336,37 @@ fn resolve_builtin<'step>(ctx_step: &'step Context) -> (Option<&'step str>, Opti
         match action {
             "sys_exit" => (Some(action), Some(sys_exit)),
             "sys_shell" => (Some(action), Some(sys_shell)),
+            "sys_vars" => (Some(action), Some(sys_vars)),
             _ => (Some(action), None)
         }
     }
     else { (None, None) }
 }
 
-fn run_step(ctx_step: Context) -> Result<Context, ExitCode> {
+fn try_as_builtin(ctx_step: &Context) -> TransientContext {
+    match resolve_builtin(&ctx_step) {
+        (Some(action), Some(sys_func)) => {
+            let ctx_sys = ctx_step.hide("whitelist").hide("i_step");
+            info!("{}: {}", "Built-in".magenta(), action);
+            if !cfg!(feature = "ci_only") {
+                eprintln!("{}", "== Context ======================".cyan());
+                eprintln!("# ctx({}) =\n{}", action.cyan(), ctx_sys);
+                eprintln!("{}", "== EOF ==========================".cyan());
+            }
+            sys_func(ctx_sys)
+        },
+        (Some(action), None) => {
+            error!("Action not recognized: {}", action);
+            TransientContext::Diverging(ExitCode::ErrYML)
+        },
+        (None, _) => {
+            error!("Syntax Error: Key `whitelist` should be a list of mappings.");
+            TransientContext::Diverging(ExitCode::ErrYML)
+        }
+    }
+}
+
+fn run_step(ctx_step: Context) -> TransientContext {
     if let Some(whitelist) = ctx_step.list_contexts("whitelist") {
         match resolve(&ctx_step, &whitelist) {
             (_, Some(ctx_source)) => {
@@ -276,7 +382,7 @@ fn run_step(ctx_step: Context) -> Result<Context, ExitCode> {
                 };
                 if let Some(CtxObj::Str(_)) = ctx_step.get("arg-resume") {
                     show_step(true);
-                    invoke(ctx_source, ctx_step.hide("whitelist").hide("i_step"))
+                    TransientContext::stateless(invoke(ctx_source, ctx_step.hide("whitelist").hide("i_step")))
                 }
                 else {
                     if let Some(ctx_docker) = ctx_step.subcontext("docker") {
@@ -299,7 +405,7 @@ fn run_step(ctx_step: Context) -> Result<Context, ExitCode> {
                             }
                             match container::docker_start(ctx_docker.clone(), resume_params) {
                                 Ok(_docker_cmd) => {
-                                    Ok(Context::new()) // TODO pass return value back as a context
+                                    TransientContext::stateless(Ok(Context::new())) // TODO pass return value back as a context
                                 },
                                 Err(e) => {
                                     match e.src {
@@ -308,72 +414,37 @@ fn run_step(ctx_step: Context) -> Result<Context, ExitCode> {
                                         },
                                         TaskErrorSource::Internal => ()
                                     }
-                                    Err(ExitCode::ErrTask)
+                                    TransientContext::Diverging(ExitCode::ErrTask)
                                 }
                             }
                         }
                         else {
                             error!("Syntax Error: Cannot parse the name of the image.");
-                            Err(ExitCode::ErrYML)
+                            TransientContext::Diverging(ExitCode::ErrYML)
                         }
                     }
                     else {
                         show_step(true);
-                        invoke(ctx_source, ctx_step.hide("whitelist").hide("i_step"))
+                        TransientContext::stateless(invoke(ctx_source, ctx_step.hide("whitelist").hide("i_step")))
                     }
                 }
             },
-            (Some(action), None) => {
-                match resolve_builtin(&ctx_step) {
-                    (_, Some(sys_func)) => {
-                        let ctx_sys = ctx_step.hide("whitelist").hide("i_step");
-                        info!("{}: {}", "Built-in".magenta(), action);
-                        if !cfg!(feature = "ci_only") {
-                            eprintln!("{}", "== Context ======================".cyan());
-                            eprintln!("# ctx({}) =\n{}", action.cyan(), ctx_sys);
-                            eprintln!("{}", "== EOF ==========================".cyan());
-                        }
-                        sys_func(ctx_sys)
-                    },
-                    (Some(_), None) => {
-                        error!("Action not recognized: {}", action);
-                        Err(ExitCode::ErrYML)
-                    },
-                    (None, None) => unreachable!()
-                }
+            (Some(_action), None) => {
+                try_as_builtin(&ctx_step)
             },
             (None, None) => {
                 error!("Syntax Error: Key `action` must be a string.");
-                Err(ExitCode::ErrYML)
+                TransientContext::Diverging(ExitCode::ErrYML)
             }
         }
     }
     else {
-        match resolve_builtin(&ctx_step) {
-            (Some(action), Some(sys_func)) => {
-                let ctx_sys = ctx_step.hide("whitelist").hide("i_step");
-                info!("{}: {}", "Built-in".magenta(), action);
-                if !cfg!(feature = "ci_only") {
-                    eprintln!("{}", "== Context ======================".cyan());
-                    eprintln!("# ctx({}) =\n{}", action.cyan(), ctx_sys);
-                    eprintln!("{}", "== EOF ==========================".cyan());
-                }
-                sys_func(ctx_sys)
-            },
-            (Some(action), None) => {
-                error!("Action not recognized: {}", action);
-                Err(ExitCode::ErrYML)
-            },
-            (None, _) => {
-                error!("Syntax Error: Key `whitelist` should be a list of mappings.");
-                Err(ExitCode::ErrYML)
-            }
-        }
+        try_as_builtin(&ctx_step)
     }    
 }
 
-fn deduce_context(ctx_step_raw: &Context, ctx_global: &Context, ctx_args: &Context, i_step: usize) -> Context {
-    let ctx_partial = ctx_global.overlay(&ctx_step_raw).overlay(&ctx_args).set("i_step", CtxObj::Int(i_step as i64));
+fn deduce_context(ctx_step_raw: &Context, ctx_global: &Context, ctx_states: &Context, i_step: usize) -> Context {
+    let ctx_partial = ctx_global.overlay(&ctx_step_raw).overlay(&ctx_states).set("i_step", CtxObj::Int(i_step as i64));
     debug!("ctx({}) =\n{}", "partial".dimmed(), ctx_partial);
     if let Some(CtxObj::Str(_)) = ctx_partial.get("arg-resume") {
         if let Some(ctx_docker) = ctx_partial.subcontext("docker").unwrap().subcontext("vars") {
@@ -404,6 +475,7 @@ fn check_playbook_fname(fname: &Path) {
 }
 
 pub fn run_yaml<P: AsRef<Path>>(playbook: P, ctx_args: Context) -> Result<(), ExitCode> {
+    let mut ctx_states = Box::new(ctx_args.clone());
     let fname = playbook.as_ref();
     check_playbook_fname(fname);
     let contents = match read_contents(fname) {
@@ -425,10 +497,10 @@ pub fn run_yaml<P: AsRef<Path>>(playbook: P, ctx_args: Context) -> Result<(), Ex
             if let Some(CtxObj::Str(i_step_str)) = ctx_args.get("arg-resume") {
                 // ^^ Then we must be in a docker container because main() has guaranteed that.
                 if let Ok(i_step) = i_step_str.parse::<usize>() {
-                    let ctx_step = deduce_context(&steps[i_step], &ctx_global, &ctx_args, i_step);
+                    let ctx_step = deduce_context(&steps[i_step], &ctx_global, ctx_states.as_ref(), i_step);
                     match run_step(ctx_step) {
-                        Ok(ctx_return) => Ok(()),
-                        Err(exit_code) => Err(exit_code)
+                        TransientContext::Stateful(_) | TransientContext::Stateless(_) => Ok(()),
+                        TransientContext::Diverging(exit_code) => Err(exit_code)
                     }
                 }
                 else {
@@ -438,10 +510,13 @@ pub fn run_yaml<P: AsRef<Path>>(playbook: P, ctx_args: Context) -> Result<(), Ex
             }
             else {
                 for (i_step, ctx_step_raw) in steps.iter().enumerate() {
-                    let ctx_step = deduce_context(ctx_step_raw, &ctx_global, &ctx_args, i_step);
+                    let ctx_step = deduce_context(ctx_step_raw, &ctx_global, ctx_states.as_ref(), i_step);
                     match run_step(ctx_step) {
-                        Ok(ctx_return) => {}
-                        Err(exit_code) => {
+                        TransientContext::Stateless(_) => { }
+                        TransientContext::Stateful(ctx_pipe) => {
+                            ctx_states = Box::new(ctx_states.overlay(&ctx_pipe));
+                        }
+                        TransientContext::Diverging(exit_code) => {
                             return Err(exit_code);
                         }
                     }
