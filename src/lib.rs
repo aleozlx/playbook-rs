@@ -24,7 +24,7 @@ use std::io::BufReader;
 use std::collections::HashMap;
 use std::result::Result;
 use std::collections::HashSet;
-use yaml_rust::{Yaml, YamlLoader};
+use yaml_rust::YamlLoader;
 use colored::*;
 use regex::Regex;
 use builtins::{TransientContext, ExitCode};
