@@ -336,7 +336,7 @@ pub fn run_playbook(raw: Context, ctx_args: Context) -> Result<(), ExitCode> {
             }
             Err(e) => {
                 error!("Syntax Error: Cannot parse the `--arg-resume` flag. {}", closure_str.underline());
-                #[cfg(featrue = "ci_only")]
+                #[cfg(feature = "ci_only")]
                 eprintln!("{}", e);
                 Err(ExitCode::ErrApp)
             }
