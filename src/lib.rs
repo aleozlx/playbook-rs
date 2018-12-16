@@ -61,6 +61,26 @@ struct Closure {
     ctx_states: Context
 }
 
+#[test]
+fn test_closure_deserialize01() {
+    let closure_str = r#"{"p":0,"s":{"data":{"playbook":{"Str":"tests/test1/say_hi.yml"}}}}"#;
+    assert_eq!(serde_json::from_str::<Closure>(closure_str).unwrap(), Closure {
+        step_ptr: 0,
+        ctx_states: Context::new().set("playbook", CtxObj::Str(String::from("tests/test1/say_hi.yml")))
+    });
+}
+
+// #[test]
+// fn test_closure_deserialize02() {
+//     let closure_str = r#"{"p":1,"s":{"data":{"playbook":{"Str":"tests/test1/test_sys_vars.yml"},"message":{"Str":"Salut!"}}}}"#;
+//     assert_eq!(serde_json::from_str::<Closure>(closure_str).unwrap(), Closure {
+//         step_ptr: 1,
+//         ctx_states: Context::new()
+//             .set("playbook", CtxObj::Str(String::from("tests/test1/say_hi.yml")))
+//             .set("message", CtxObj::Str(String::from("Salut!")))
+//     });
+// }
+
 pub fn copy_user_info(facts: &mut HashMap<String, String>, user: &str) {
     if let Some(output) = std::process::Command::new("getent").args(&["passwd", &user]).output().ok() {
         let stdout = String::from_utf8_lossy(&output.stdout).into_owned();

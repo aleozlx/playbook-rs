@@ -139,7 +139,7 @@ pub fn docker_start<I, S>(ctx_docker: Context, cmd: I) -> Result<String, TaskErr
         Ok(ForkResult::Child) => {
             match execvp(&CString::new("docker").unwrap(), &docker_linux) {
                 Ok(_void) => unreachable!(),
-                Err(e) => Err(TaskError { msg: String::from("Failed to issue the Docker command."), src: TaskErrorSource::NixError(e) }),
+                Err(e) => Err(TaskError { msg: format!("Failed to issue the Docker command. {}", e), src: TaskErrorSource::NixError(e) }),
             }
         },
         Ok(ForkResult::Parent { child, .. }) => {
