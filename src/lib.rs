@@ -1,12 +1,16 @@
 #[macro_use]
 extern crate log;
 
+#[macro_use]
+extern crate serde_derive;
+
 extern crate yaml_rust;
 extern crate ymlctx;
 extern crate colored;
 extern crate regex;
 extern crate nix;
 extern crate impersonate;
+extern crate serde_json;
 
 #[cfg(feature = "lang_python")]
 extern crate pyo3;
@@ -47,6 +51,14 @@ impl std::fmt::Display for TaskError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", &self.msg)
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+struct Closure {
+    #[serde(rename = "p")]
+    step_ptr: usize,
+    #[serde(rename = "s")]
+    ctx_states: Context
 }
 
 pub fn copy_user_info(facts: &mut HashMap<String, String>, user: &str) {
@@ -175,10 +187,10 @@ fn resolve<'step>(ctx_step: &'step Context, whitelist: &Vec<Context>) -> (Option
     }
 }
 
-fn try_as_builtin(ctx_step: &Context) -> TransientContext {
+fn try_as_builtin(ctx_step: &Context, closure: &Closure) -> TransientContext {
     match builtins::resolve(&ctx_step) {
         (Some(action), Some(sys_func)) => {
-            let ctx_sys = ctx_step.hide("whitelist").hide("i_step");
+            let ctx_sys = ctx_step.hide("whitelist");
             info!("{}: {}", "Built-in".magenta(), action);
             if !cfg!(feature = "ci_only") {
                 eprintln!("{}", "== Context ======================".cyan());
@@ -198,13 +210,12 @@ fn try_as_builtin(ctx_step: &Context) -> TransientContext {
     }
 }
 
-fn run_step(ctx_step: Context) -> TransientContext {
+fn run_step(ctx_step: Context, closure: Closure) -> TransientContext {
     if let Some(whitelist) = ctx_step.list_contexts("whitelist") {
         match resolve(&ctx_step, &whitelist) {
             (_, Some(ctx_source)) => {
-                let i_step: usize = ctx_step.unpack("i_step").unwrap();
                 let show_step = |for_real: bool| {
-                    let step_header = format!("Step {}", i_step+1).cyan();
+                    let step_header = format!("Step {}", closure.step_ptr+1).cyan();
                     if let Some(CtxObj::Str(step_name)) = ctx_step.get("name") {
                         info!("{}: {}", if for_real { step_header } else { step_header.dimmed() }, step_name);
                     }
@@ -214,7 +225,7 @@ fn run_step(ctx_step: Context) -> TransientContext {
                 };
                 if let Some(CtxObj::Str(_)) = ctx_step.get("arg-resume") {
                     show_step(true);
-                    TransientContext::assume_stateless(invoke(ctx_source, ctx_step.hide("whitelist").hide("i_step")))
+                    TransientContext::assume_stateless(invoke(ctx_source, ctx_step.hide("whitelist")))
                 }
                 else {
                     if let Some(ctx_docker) = ctx_step.subcontext("docker") {
@@ -222,7 +233,14 @@ fn run_step(ctx_step: Context) -> TransientContext {
                         if let Some(CtxObj::Str(image_name)) = ctx_docker.get("image") {
                             info!("Entering Docker: {}", image_name.purple());
                             let mut resume_params = vec! [
-                                format!("--arg-resume={}", i_step),
+                                String::from("--arg-resume"),
+                                match serde_json::to_string(&closure) {
+                                    Ok(s) => s,
+                                    Err(e) => {
+                                        error!("Failed to serialize states.");
+                                        return TransientContext::Diverging(ExitCode::ErrApp)
+                                    }
+                                },
                                 ctx_step.unpack("playbook").unwrap()
                             ];
                             let relocate_unpack = ctx_step.unpack("relocate");
@@ -257,12 +275,12 @@ fn run_step(ctx_step: Context) -> TransientContext {
                     }
                     else {
                         show_step(true);
-                        TransientContext::assume_stateless(invoke(ctx_source, ctx_step.hide("whitelist").hide("i_step")))
+                        TransientContext::assume_stateless(invoke(ctx_source, ctx_step.hide("whitelist")))
                     }
                 }
             },
             (Some(_action), None) => {
-                try_as_builtin(&ctx_step)
+                try_as_builtin(&ctx_step, &closure)
             },
             (None, None) => {
                 error!("Syntax Error: Key `action` must be a string.");
@@ -271,12 +289,12 @@ fn run_step(ctx_step: Context) -> TransientContext {
         }
     }
     else {
-        try_as_builtin(&ctx_step)
+        try_as_builtin(&ctx_step, &closure)
     }    
 }
 
-fn deduce_context(ctx_step_raw: &Context, ctx_global: &Context, ctx_states: &Context, i_step: usize) -> Context {
-    let ctx_partial = ctx_global.overlay(&ctx_step_raw).overlay(&ctx_states).set("i_step", CtxObj::Int(i_step as i64));
+fn deduce_context(ctx_step_raw: &Context, ctx_global: &Context, closure: &Closure) -> Context {
+    let ctx_partial = ctx_global.overlay(&ctx_step_raw).overlay(&closure.ctx_states);
     debug!("ctx({}) =\n{}", "partial".dimmed(), ctx_partial);
     if let Some(CtxObj::Str(_)) = ctx_partial.get("arg-resume") {
         if let Some(ctx_docker) = ctx_partial.subcontext("docker").unwrap().subcontext("vars") {
@@ -306,24 +324,29 @@ pub fn run_playbook(raw: Context, ctx_args: Context) -> Result<(), ExitCode> {
             return Err(e);
         }
     };
-    if let Some(CtxObj::Str(i_step_str)) = ctx_args.get("arg-resume") {
+    if let Some(CtxObj::Str(closure_str)) = ctx_args.get("arg-resume") {
         // ^^ Then we must be in a docker container because main() has guaranteed that.
-        if let Ok(i_step) = i_step_str.parse::<usize>() {
-            let ctx_step = deduce_context(&steps[i_step], &ctx_global, ctx_states.as_ref(), i_step);
-            match run_step(ctx_step) {
-                TransientContext::Stateful(_) | TransientContext::Stateless(_) => Ok(()),
-                TransientContext::Diverging(exit_code) => Err(exit_code)
+        match serde_json::from_str::<Closure>(closure_str) {
+            Ok(closure) => {
+                let ctx_step = deduce_context(&steps[closure.step_ptr], &ctx_global, &closure);
+                match run_step(ctx_step, closure) {
+                    TransientContext::Stateful(_) | TransientContext::Stateless(_) => Ok(()),
+                    TransientContext::Diverging(exit_code) => Err(exit_code)
+                }
             }
-        }
-        else {
-            error!("Syntax Error: Cannot parse the `--arg-resume` flag.");
-            Err(ExitCode::ErrApp)
+            Err(e) => {
+                error!("Syntax Error: Cannot parse the `--arg-resume` flag. {}", closure_str.underline());
+                #[cfg(featrue = "ci_only")]
+                eprintln!("{}", e);
+                Err(ExitCode::ErrApp)
+            }
         }
     }
     else {
-        for (i_step, ctx_step_raw) in steps.iter().enumerate() {
-            let ctx_step = deduce_context(ctx_step_raw, &ctx_global, ctx_states.as_ref(), i_step);
-            match run_step(ctx_step) {
+        for (i, ctx_step_raw) in steps.iter().enumerate() {
+            let closure = Closure { step_ptr: i, ctx_states: ctx_states.as_ref().clone() };
+            let ctx_step = deduce_context(ctx_step_raw, &ctx_global, &closure);
+            match run_step(ctx_step, closure) {
                 TransientContext::Stateless(_) => { }
                 TransientContext::Stateful(ctx_pipe) => {
                     ctx_states = Box::new(ctx_states.overlay(&ctx_pipe));
