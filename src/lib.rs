@@ -55,16 +55,19 @@ impl std::fmt::Display for TaskError {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct Closure {
+    #[serde(rename = "c")]
+    container: u8,
     #[serde(rename = "p")]
     step_ptr: usize,
     #[serde(rename = "s")]
-    ctx_states: Context
+    ctx_states: Context,
 }
 
 #[test]
 fn test_closure_deserialize01() {
-    let closure_str = r#"{"p":0,"s":{"data":{"playbook":{"Str":"tests/test1/say_hi.yml"}}}}"#;
+    let closure_str = r#"{"c":1,"p":0,"s":{"data":{"playbook":{"Str":"tests/test1/say_hi.yml"}}}}"#;
     assert_eq!(serde_json::from_str::<Closure>(closure_str).unwrap(), Closure {
+        container: 1,
         step_ptr: 0,
         ctx_states: Context::new().set("playbook", CtxObj::Str(String::from("tests/test1/say_hi.yml")))
     });
@@ -243,7 +246,7 @@ fn run_step(ctx_step: Context, closure: Closure) -> TransientContext {
                         info!("{}", if for_real { step_header } else { step_header.dimmed() });
                     }
                 };
-                if let Some(CtxObj::Str(_)) = ctx_step.get("arg-resume") {
+                if closure.container == 1 {
                     show_step(true);
                     TransientContext::assume_stateless(invoke(ctx_source, ctx_step.hide("whitelist")))
                 }
@@ -252,9 +255,11 @@ fn run_step(ctx_step: Context, closure: Closure) -> TransientContext {
                         show_step(false);
                         if let Some(CtxObj::Str(image_name)) = ctx_docker.get("image") {
                             info!("Entering Docker: {}", image_name.purple());
+                            let mut closure1 = closure.clone();
+                            closure1.container = 1;
                             let mut resume_params = vec! [
                                 String::from("--arg-resume"),
-                                match serde_json::to_string(&closure) {
+                                match serde_json::to_string(&closure1) {
                                     Ok(s) => s,
                                     Err(e) => {
                                         error!("Failed to serialize states.");
@@ -364,7 +369,7 @@ pub fn run_playbook(raw: Context, ctx_args: Context) -> Result<(), ExitCode> {
     }
     else {
         for (i, ctx_step_raw) in steps.iter().enumerate() {
-            let closure = Closure { step_ptr: i, ctx_states: ctx_states.as_ref().clone() };
+            let closure = Closure { container: 0, step_ptr: i, ctx_states: ctx_states.as_ref().clone() };
             let ctx_step = deduce_context(ctx_step_raw, &ctx_global, &closure);
             match run_step(ctx_step, closure) {
                 TransientContext::Stateless(_) => { }
