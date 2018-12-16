@@ -64,6 +64,16 @@ struct Closure {
 }
 
 #[test]
+fn test_closure_deserialize00() {
+    let closure_str = r#"{"c":1,"p":0,"s":{"data":{}}}"#;
+    assert_eq!(serde_json::from_str::<Closure>(closure_str).unwrap(), Closure {
+        container: 1,
+        step_ptr: 0,
+        ctx_states: Context::new()
+    });
+}
+
+#[test]
 fn test_closure_deserialize01() {
     let closure_str = r#"{"c":1,"p":0,"s":{"data":{"playbook":{"Str":"tests/test1/say_hi.yml"}}}}"#;
     assert_eq!(serde_json::from_str::<Closure>(closure_str).unwrap(), Closure {
@@ -82,6 +92,16 @@ fn test_closure_deserialize01() {
 //             .set("playbook", CtxObj::Str(String::from("tests/test1/say_hi.yml")))
 //             .set("message", CtxObj::Str(String::from("Salut!")))
 //     });
+// }
+
+// #[test]
+// fn test_closure_deserialize02() {
+//     let closure_str = r#"{"c":1,"p":1,"s":{"data":{"playbook":{"Str":"tests/test1/test_sys_vars.yml"},"message":{"Str":"Salut!"}}}}"#;
+//     assert_eq!(closure_str, &serde_json::to_string(&Closure {
+//         container: 1,
+//         step_ptr: 0,
+//         ctx_states: Context::new()
+//     }).unwrap());
 // }
 
 pub fn copy_user_info(facts: &mut HashMap<String, String>, user: &str) {
@@ -318,8 +338,8 @@ fn run_step(ctx_step: Context, closure: Closure) -> TransientContext {
     }    
 }
 
-fn deduce_context(ctx_step_raw: &Context, ctx_global: &Context, closure: &Closure) -> Context {
-    let ctx_partial = ctx_global.overlay(&ctx_step_raw).overlay(&closure.ctx_states);
+fn deduce_context(ctx_step_raw: &Context, ctx_global: &Context, ctx_args: &Context, closure: &Closure) -> Context {
+    let ctx_partial = ctx_global.overlay(ctx_step_raw).overlay(ctx_args).overlay(&closure.ctx_states);
     debug!("ctx({}) =\n{}", "partial".dimmed(), ctx_partial);
     if let Some(CtxObj::Str(_)) = ctx_partial.get("arg-resume") {
         if let Some(ctx_docker) = ctx_partial.subcontext("docker").unwrap().subcontext("vars") {
@@ -341,7 +361,7 @@ fn get_steps(raw: Context) -> Result<(Vec<Context>, Context), ExitCode> {
 }
 
 pub fn run_playbook(raw: Context, ctx_args: Context) -> Result<(), ExitCode> {
-    let mut ctx_states = Box::new(ctx_args.clone());
+    let mut ctx_states = Box::new(ctx_args.hide("playbook")); // ! BUG separate ctx_args and ctx_states
     let (steps, ctx_global) = match get_steps(raw) {
         Ok(v) => v,
         Err(e) => {
@@ -353,7 +373,7 @@ pub fn run_playbook(raw: Context, ctx_args: Context) -> Result<(), ExitCode> {
         // ^^ Then we must be in a docker container because main() has guaranteed that.
         match serde_json::from_str::<Closure>(closure_str) {
             Ok(closure) => {
-                let ctx_step = deduce_context(&steps[closure.step_ptr], &ctx_global, &closure);
+                let ctx_step = deduce_context(&steps[closure.step_ptr], &ctx_global, &ctx_args, &closure);
                 match run_step(ctx_step, closure) {
                     TransientContext::Stateful(_) | TransientContext::Stateless(_) => Ok(()),
                     TransientContext::Diverging(exit_code) => Err(exit_code)
@@ -370,7 +390,7 @@ pub fn run_playbook(raw: Context, ctx_args: Context) -> Result<(), ExitCode> {
     else {
         for (i, ctx_step_raw) in steps.iter().enumerate() {
             let closure = Closure { container: 0, step_ptr: i, ctx_states: ctx_states.as_ref().clone() };
-            let ctx_step = deduce_context(ctx_step_raw, &ctx_global, &closure);
+            let ctx_step = deduce_context(ctx_step_raw, &ctx_global, &ctx_args, &closure);
             match run_step(ctx_step, closure) {
                 TransientContext::Stateless(_) => { }
                 TransientContext::Stateful(ctx_pipe) => {
