@@ -79,6 +79,7 @@ fn main() {
             0 => None,
             v => Some(CtxObj::Int(v as i64))
         });
+    println!("RESUME>>>{}<<<", ctx_args);
     let mut playbook = Path::new(args.value_of("PLAYBOOK").unwrap()).to_path_buf();
     if let Some(_) = ctx_args.get("arg-resume") {
         if !playbook_api::container::inside_docker() {
