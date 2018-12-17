@@ -3,6 +3,7 @@ use std::path::Path;
 use colored::*;
 use yaml_rust::YamlLoader;
 use ymlctx::context::{Context, CtxObj};
+use itertools::Itertools;
 
 #[derive(Clone)]
 pub enum ExitCode {
@@ -125,6 +126,12 @@ fn shell(ctx: Context) -> TransientContext {
     }
 }
 
+fn single_key(ctx: &Context) -> Option<&str> {
+    let keys: Vec<&str> = ctx.keys().into_iter().map(|s| {s as &str}).collect();
+    if keys.len() == 1 { Some(&keys[0]) }
+    else { None }
+}
+
 /// Parallelism!
 /// 
 /// **Example(s)**
@@ -139,28 +146,56 @@ fn shell(ctx: Context) -> TransientContext {
 ///   - param2: [0.03, 0.01, 0.003, 0.001]
 /// ```
 fn fork(ctx: Context) -> TransientContext {
-    if let Some(resources) = ctx.subcontext("resource") {
-        let keys: Vec<String> = resources.keys().cloned().into_iter().collect();
-        if keys.len() > 0 {
-            let nproc = keys.len();
-            let resource_type = &keys[0];
-            if let Some(CtxObj::Array(pool)) = resources.get(resource_type) {
-                
-            }
-            else { TransientContext::Diverging(ExitCode::ErrYML); }
+    let grid = match ctx.list_contexts("grid") {
+        Some(params) => params,
+        None => {
+            error!("Key `grid` is required.");
+            return TransientContext::Diverging(ExitCode::ErrYML);
         }
+    };
+    if let Some(resources) = ctx.subcontext("resource") {
+        if let Some(resource_type) = single_key(&resources) {
+            if let Some(CtxObj::Array(pool)) = resources.get(resource_type) {
+                fork_pool(grid, pool)
+            }
+            else { TransientContext::Diverging(ExitCode::ErrYML) }
+        }
+        else { fork_nolimit(grid) }
     }
-    else {
+    else { fork_nolimit(grid) }
+}
 
+fn param_space_iter<'a, GridIterator>(grid: GridIterator) -> impl Iterator<Item = Context> + 'a 
+    where GridIterator: std::iter::IntoIterator<Item = &'a Context> + Copy
+{
+    let header: Vec<&str> = grid.into_iter().filter_map(single_key).collect();
+    grid.into_iter().filter_map(|ctx_param| {
+        if let Some(key) = single_key(&ctx_param) {
+            if let Some(CtxObj::Array(params)) = ctx_param.get(key) {
+                Some(params.iter())
+            }
+            else { None }
+        }
+        else { None }
+    }).multi_cartesian_product().into_iter().map(move |params| {
+        let mut ctx_local = Context::new();
+        for (&k, v) in header.iter().zip(params) {
+            ctx_local = ctx_local.set(k, v.clone());
+        }
+        return ctx_local;
+    })
+}
+
+fn fork_nolimit(grid: Vec<Context>) -> TransientContext {
+    for ctx in param_space_iter(&grid) {
+        println!("{}", ctx);
     }
+    panic!();
+}
 
-    let a = vec![1,2,3];
-  let b = vec![4,5,6];
-  for (i, j) in iproduct!(a, b) {
-       println!("{} {}", i, j);
-    }
-
-    TransientContext::Diverging(ExitCode::Success)
+fn fork_pool(grid: Vec<Context>, pool: &Vec<CtxObj>) -> TransientContext {
+    let nproc = pool.len();
+    TransientContext::Diverging(ExitCode::ErrSys)
 }
 
 /// Dynamically import vars into the `ctx_states` context.
