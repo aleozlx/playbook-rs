@@ -370,7 +370,10 @@ pub fn run_playbook(raw: Context, ctx_args: Context) -> Result<(), ExitCode> {
                 let ctx_step = deduce_context(&steps[closure.step_ptr], &ctx_global, &ctx_args, &closure);
                 match run_step(ctx_step, closure) {
                     TransientContext::Stateful(_) | TransientContext::Stateless(_) => Ok(()),
-                    TransientContext::Diverging(exit_code) => Err(exit_code)
+                    TransientContext::Diverging(exit_code) => match exit_code {
+                        ExitCode::Success => Ok(()),
+                        _ => Err(exit_code)
+                    }
                 }
             }
             Err(_e) => {
@@ -390,8 +393,9 @@ pub fn run_playbook(raw: Context, ctx_args: Context) -> Result<(), ExitCode> {
                 TransientContext::Stateful(ctx_pipe) => {
                     ctx_states = Box::new(ctx_states.overlay(&ctx_pipe));
                 }
-                TransientContext::Diverging(exit_code) => {
-                    return Err(exit_code);
+                TransientContext::Diverging(exit_code) => match exit_code {
+                    ExitCode::Success => { return Ok(()); }
+                    _ => { return Err(exit_code); }
                 }
             }
         }
