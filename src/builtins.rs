@@ -165,8 +165,9 @@ fn fork(ctx: Context) -> TransientContext {
     else { fork_nolimit(grid) }
 }
 
-fn param_space_iter<'a, GridIterator>(grid: GridIterator) -> impl Iterator<Item = Context> + 'a 
-    where GridIterator: std::iter::IntoIterator<Item = &'a Context> + Copy
+fn param_space_iter<'a, G>(grid: G) -> impl Iterator<Item = Context> + 'a 
+    where G: std::iter::IntoIterator<Item = &'a Context> + Copy
+    // ^^^ Really, I am just targeting impl<'a, T> IntoIterator for &'a Vec<T>
 {
     let header: Vec<&str> = grid.into_iter().filter_map(single_key).collect();
     grid.into_iter().filter_map(|ctx_param| {
@@ -190,7 +191,8 @@ fn fork_nolimit(grid: Vec<Context>) -> TransientContext {
     for ctx in param_space_iter(&grid) {
         println!("{}", ctx);
     }
-    panic!();
+    TransientContext::Diverging(ExitCode::Success) // TODO WIP
+    // panic!();
 }
 
 fn fork_pool(grid: Vec<Context>, pool: &Vec<CtxObj>) -> TransientContext {
