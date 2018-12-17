@@ -271,6 +271,10 @@ fn run_step(ctx_step: Context, closure: Closure) -> TransientContext {
                             info!("Entering Docker: {}", image_name.purple());
                             let mut closure1 = closure.clone();
                             closure1.container = 1;
+                            // Register any reassignment of "playbook" to the ctx_states to prolong its lifetime
+                            if let Some(ctx_docker_vars) = ctx_docker.subcontext("vars") {
+                                closure1.ctx_states = closure1.ctx_states.set_opt("playbook", ctx_docker_vars.get_clone("playbook"));
+                            }
                             let mut resume_params = vec! [
                                 String::from("--arg-resume"),
                                 match serde_json::to_string(&closure1) {
@@ -282,10 +286,6 @@ fn run_step(ctx_step: Context, closure: Closure) -> TransientContext {
                                 },
                                 ctx_step.unpack("playbook").unwrap()
                             ];
-                            let relocate_unpack = ctx_step.unpack("relocate");
-                            if let Ok(relocate) = relocate_unpack {
-                                resume_params.push(relocate);
-                            }
                             let verbose_unpack = ctx_step.unpack("verbose-fern");
                             if let Ok(verbose) = verbose_unpack {
                                 if verbose > 0 {
@@ -336,8 +336,8 @@ fn deduce_context(ctx_step_raw: &Context, ctx_global: &Context, ctx_args: &Conte
     let ctx_partial = ctx_global.overlay(ctx_step_raw).overlay(ctx_args).overlay(&closure.ctx_states);
     debug!("ctx({}) =\n{}", "partial".dimmed(), ctx_partial);
     if let Some(CtxObj::Str(_)) = ctx_partial.get("arg-resume") {
-        if let Some(ctx_docker) = ctx_partial.subcontext("docker").unwrap().subcontext("vars") {
-            ctx_partial.overlay(&ctx_docker).hide("docker")
+        if let Some(ctx_docker_vars) = ctx_partial.subcontext("docker").unwrap().subcontext("vars") {
+            ctx_partial.overlay(&ctx_docker_vars).hide("docker")
         }
         else { ctx_partial.hide("docker") }
     }

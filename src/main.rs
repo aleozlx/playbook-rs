@@ -52,7 +52,6 @@ fn main() {
             (about: crate_description!())
             (@arg RESUME: --("arg-resume") +takes_value "For playbook-rs use ONLY: indicator that we have entered a container")
             (@arg ASSERT_VER: --("arg-version") +takes_value "For playbook-rs use ONLY: to ensure the binary versions match")
-            (@arg RELOCATE: --relocate +takes_value "Relocation of the playbook inside docker, required when using abs. path")
             (@arg VERBOSE: --verbose -v ... "Log verbosity")
             (@arg PLAYBOOK: +required "YAML playbook")
         ).get_matches();
@@ -61,7 +60,6 @@ fn main() {
             (version: crate_version!())
             (author: crate_authors!())
             (about: crate_description!())
-            (@arg RELOCATE: --relocate +takes_value "Relocation of the playbook inside docker, required when using abs. path")
             (@arg VERBOSE: --verbose -v ... "Log verbosity")
             (@arg PLAYBOOK: +required "YAML playbook")
         ).get_matches();
@@ -73,7 +71,6 @@ fn main() {
     }
     let ctx_args = Context::new()
         .set_opt("arg-resume", map_arg!(args => RESUME))
-        .set_opt("relocate", map_arg!(args => RELOCATE))
         .set_opt("playbook", map_arg!(args => PLAYBOOK))
         .set_opt("verbose-fern", match args.occurrences_of("VERBOSE") {
             0 => None,
@@ -85,11 +82,6 @@ fn main() {
             error!("Context error: Not inside of a Docker container.");
             finalize(ExitCode::ErrApp);
         }
-        // * Related issue: https://github.com/aleozlx/playbook-rs/issues/6
-        if let Some(relocate) = args.value_of("RELOCATE") {
-            playbook = Path::new(relocate).join(playbook.file_name().unwrap());
-        }
-
         if let Ok(ref become_id) = std::env::var("IMPERSONATE") {
             match impersonate::User::from_id(become_id).unwrap().su() {
                 Ok(()) => (),

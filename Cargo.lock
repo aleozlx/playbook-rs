@@ -312,7 +312,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "playbook"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "chrono 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 2.32.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -330,7 +330,7 @@ dependencies = [
  "serde_json 1.0.33 (registry+https://github.com/rust-lang/crates.io-index)",
  "tempfile 3.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "yaml-rust 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "ymlctx 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ymlctx 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -737,7 +737,7 @@ dependencies = [
 
 [[package]]
 name = "ymlctx"
-version = "0.1.6"
+version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "pyo3 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -838,4 +838,4 @@ dependencies = [
 "checksum winapi-i686-pc-windows-gnu 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ac3b87c63620426dd9b991e5ce0329eff545bccbbb34f3be09ff6fb6ab51b7b6"
 "checksum winapi-x86_64-pc-windows-gnu 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 "checksum yaml-rust 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)" = "95acf0db5515d07da9965ec0e0ba6cc2d825e2caeb7303b66ca441729801254e"
-"checksum ymlctx 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)" = "da78eb009b08c81444fd4a02433e2cd1d80236969a0acf85b89465547d4df560"
+"checksum ymlctx 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)" = "b37e665d0632d898d7533184196110911701a0272d131ffbf8753b0e837c3c50"
