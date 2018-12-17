@@ -2,8 +2,10 @@
 
 [![Build Status](https://img.shields.io/travis/aleozlx/playbook-rs/master.svg?style=flat-square&label=master)](https://travis-ci.org/aleozlx/playbook-rs)
 [![Build Status](https://img.shields.io/travis/aleozlx/playbook-rs/dev.svg?style=flat-square&label=nightly)](https://travis-ci.org/aleozlx/playbook-rs)
-[![CI Base Image](https://img.shields.io/docker/automated/aleozlx/playbook-test.svg?style=flat-square)](https://hub.docker.com/r/aleozlx/playbook-test/tags/)
+[![Docs](https://img.shields.io/badge/docs.rs-playbook-blue.svg)](https://docs.rs/playbook)
 [![Version](https://img.shields.io/crates/v/playbook.svg?style=flat-square)](https://crates.io/crates/playbook)
+[![CI Base Image](https://img.shields.io/docker/automated/aleozlx/playbook-test.svg?style=flat-square)](https://hub.docker.com/r/aleozlx/playbook-test/tags/)
+![Language](https://img.shields.io/github/languages/top/aleozlx/playbook-rs.svg)
 
 
 YAML driven Docker DevOps
