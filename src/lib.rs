@@ -4,6 +4,9 @@ extern crate log;
 #[macro_use]
 extern crate serde_derive;
 
+#[macro_use]
+extern crate itertools;
+
 extern crate yaml_rust;
 extern crate ymlctx;
 extern crate colored;
@@ -224,7 +227,7 @@ fn resolve<'step>(ctx_step: &'step Context, whitelist: &Vec<Context>) -> (Option
 fn try_as_builtin(ctx_step: &Context, closure: &Closure) -> TransientContext {
     match builtins::resolve(&ctx_step) {
         (Some(action), Some(sys_func)) => {
-            let ctx_sys = ctx_step.hide("whitelist");
+            let ctx_sys = ctx_step.overlay(&closure.ctx_states).hide("whitelist");
             info!("{}: {}", "Built-in".magenta(), action);
             if !cfg!(feature = "ci_only") {
                 eprintln!("{}", "== Context ======================".cyan());
@@ -259,7 +262,7 @@ fn run_step(ctx_step: Context, closure: Closure) -> TransientContext {
                 };
                 if closure.container == 1 {
                     show_step(true);
-                    TransientContext::assume_stateless(invoke(ctx_source, ctx_step.hide("whitelist")))
+                    TransientContext::from(invoke(ctx_source, ctx_step.hide("whitelist")))
                 }
                 else {
                     if let Some(ctx_docker) = ctx_step.subcontext("docker") {
@@ -272,7 +275,7 @@ fn run_step(ctx_step: Context, closure: Closure) -> TransientContext {
                                 String::from("--arg-resume"),
                                 match serde_json::to_string(&closure1) {
                                     Ok(s) => s,
-                                    Err(e) => {
+                                    Err(_) => {
                                         error!("Failed to serialize states.");
                                         return TransientContext::Diverging(ExitCode::ErrApp)
                                     }
@@ -291,7 +294,7 @@ fn run_step(ctx_step: Context, closure: Closure) -> TransientContext {
                             }
                             match container::docker_start(ctx_docker.clone(), resume_params) {
                                 Ok(_docker_cmd) => {
-                                    TransientContext::assume_stateless(Ok(Context::new())) // TODO pass return value back as a context
+                                    TransientContext::from(Ok(Context::new())) // TODO pass return value back as a context
                                 },
                                 Err(e) => {
                                     match e.src {
@@ -311,7 +314,7 @@ fn run_step(ctx_step: Context, closure: Closure) -> TransientContext {
                     }
                     else {
                         show_step(true);
-                        TransientContext::assume_stateless(invoke(ctx_source, ctx_step.hide("whitelist")))
+                        TransientContext::from(invoke(ctx_source, ctx_step.hide("whitelist")))
                     }
                 }
             },
@@ -352,7 +355,7 @@ fn get_steps(raw: Context) -> Result<(Vec<Context>, Context), ExitCode> {
 }
 
 pub fn run_playbook(raw: Context, ctx_args: Context) -> Result<(), ExitCode> {
-    let mut ctx_states = Box::new(ctx_args.hide("playbook")); // ! BUG separate ctx_args and ctx_states
+    let mut ctx_states = Box::new(Context::new());
     let (steps, ctx_global) = match get_steps(raw) {
         Ok(v) => v,
         Err(e) => {
@@ -370,10 +373,10 @@ pub fn run_playbook(raw: Context, ctx_args: Context) -> Result<(), ExitCode> {
                     TransientContext::Diverging(exit_code) => Err(exit_code)
                 }
             }
-            Err(e) => {
+            Err(_e) => {
                 error!("Syntax Error: Cannot parse the `--arg-resume` flag. {}", closure_str.underline());
                 #[cfg(feature = "ci_only")]
-                eprintln!("{}", e);
+                eprintln!("{}", _e);
                 Err(ExitCode::ErrApp)
             }
         }

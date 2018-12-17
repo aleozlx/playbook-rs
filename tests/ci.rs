@@ -118,3 +118,24 @@ mod test_containers {
         }
     }
 }
+
+#[cfg(test)]
+mod test_parallelism {
+    // use std::io::prelude::*;
+    // use std::os::unix::fs::PermissionsExt;
+    use playbook_api::{Context, CtxObj};
+
+    #[test]
+    fn trying_out_sys_fork(){
+        let playbook = playbook_api::load_yaml("tests/test2/fork_simple.yml").expect("Cannot load test playbook.");
+        let ctx_args = Context::new()
+            .set("playbook", CtxObj::Str(String::from("tests/test2/fork_simple.yml")));
+        match playbook_api::run_playbook(playbook, ctx_args) {
+            Ok(()) => {
+                // let output = get_output(&scratch, "output.txt");
+                // assert_eq!(output, String::from("Salut!\n"));
+            }
+            Err(e) => { panic!("Error: exit_code = {:?}", e); }
+        }
+    }
+}

@@ -1,0 +1,4 @@
+---
+steps:
+- name: Trying out sys_fork
+  action: sys_fork

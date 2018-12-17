@@ -107,10 +107,6 @@ fn main() {
         },
         Err(e) => exit(e)
     };
-
-    // if let Err(e) = playbook_api::run_yaml(&playbook, ctx_args) {
-    //     exit(e);
-    // }
 }
 
 fn clean_up() {

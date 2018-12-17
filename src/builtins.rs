@@ -40,8 +40,8 @@ pub enum TransientContext {
     Diverging(ExitCode)
 }
 
-impl TransientContext {
-    pub fn assume_stateless(x: Result<Context, ExitCode>) -> TransientContext {
+impl From<Result<Context, ExitCode>> for TransientContext {
+    fn from(x: Result<Context, ExitCode>) -> Self {
         match x {
             Ok(v) => TransientContext::Stateless(v),
             Err(e) => TransientContext::Diverging(e)
@@ -57,6 +57,7 @@ pub fn resolve<'step>(ctx_step: &'step Context) -> (Option<&'step str>, Option<B
             "sys_exit" => (Some(action), Some(exit)),
             "sys_shell" => (Some(action), Some(shell)),
             "sys_vars" => (Some(action), Some(vars)),
+            "sys_fork" => (Some(action), Some(fork)),
             _ => (Some(action), None)
         }
     }
@@ -124,18 +125,46 @@ fn shell(ctx: Context) -> TransientContext {
     }
 }
 
+/// Parallelism!
+/// 
+/// **Example(s)**
+/// ```yaml
+/// action: sys_fork
+/// states:
+///   from: named.yml
+///   resource:
+///     cuda_devices: ["0", "1", "2", "3"]
+///   grid:
+///   - param1: [10, 20, 40, 80, 160]
+///   - param2: [0.03, 0.01, 0.003, 0.001]
+/// ```
 fn fork(ctx: Context) -> TransientContext {
-    if let Some(rc) = ctx.subcontext("resource") {
-
+    if let Some(resources) = ctx.subcontext("resource") {
+        let keys: Vec<String> = resources.keys().cloned().into_iter().collect();
+        if keys.len() > 0 {
+            let nproc = keys.len();
+            let resource_type = &keys[0];
+            if let Some(CtxObj::Array(pool)) = resources.get(resource_type) {
+                
+            }
+            else { TransientContext::Diverging(ExitCode::ErrYML); }
+        }
     }
     else {
 
     }
-    TransientContext::Diverging(ExitCode::ErrApp) // TODO
+
+    let a = vec![1,2,3];
+  let b = vec![4,5,6];
+  for (i, j) in iproduct!(a, b) {
+       println!("{} {}", i, j);
+    }
+
+    TransientContext::Diverging(ExitCode::Success)
 }
 
 /// Dynamically import vars into the `ctx_states` context.
-/// This is the only system action that introduces statefulness to the entire operation.
+/// This is the only system action that introduces external states to the workflow.
 /// 
 /// **Example(s)**
 /// ```yaml
