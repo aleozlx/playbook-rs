@@ -35,6 +35,14 @@ impl Into<i32> for ExitCode {
     }
 }
 
+/// A context labeled as either stateful or stateless,
+/// or diverging when neither is applicable, in which case the program must provide an exit code and exit gracefully.
+/// 
+/// This data structure is only used in the decision making in between steps, therefore it is transient.
+/// 
+/// A stateful context may affect all following steps by appearing in the ctx_states and arg-resume.
+/// On the other hand, a stateless context will still be collected by the playbook for any reason it may need it,
+/// then discarded before the next step begins.
 pub enum TransientContext {
     Stateful(Context),
     Stateless(Context),
@@ -51,6 +59,8 @@ impl From<Result<Context, ExitCode>> for TransientContext {
 }
 
 type BuiltIn = fn(Context) -> TransientContext;
+
+/// The built-in tasks resolver
 pub fn resolve<'step>(ctx_step: &'step Context) -> (Option<&'step str>, Option<BuiltIn>) {
     if let Some(CtxObj::Str(action)) = ctx_step.get("action") {
         let action: &'step str = action;
@@ -74,7 +84,7 @@ pub fn resolve<'step>(ctx_step: &'step Context) -> (Option<&'step str>, Option<B
 /// action: sys_exit
 /// exit_code: 1
 /// ```
-fn exit(ctx: Context) -> TransientContext {
+pub fn exit(ctx: Context) -> TransientContext {
     TransientContext::Diverging(ExitCode::Any(if let Ok(exit_code) = ctx.unpack("exit_code") { exit_code } else { 0 }))
 }
 
@@ -87,7 +97,7 @@ fn exit(ctx: Context) -> TransientContext {
 /// action: sys_shell
 /// bash: ['echo', 'hi']
 /// ```
-fn shell(ctx: Context) -> TransientContext {
+pub fn shell(ctx: Context) -> TransientContext {
     if let Some(ctx_docker) = ctx.subcontext("docker") {
         if let Some(CtxObj::Array(bash_cmd)) = ctx.get("bash") {
             let cmd = super::format_cmd(bash_cmd.iter().map(|arg| {
@@ -145,7 +155,7 @@ fn single_key(ctx: &Context) -> Option<&str> {
 ///   - param1: [10, 20, 40, 80, 160]
 ///   - param2: [0.03, 0.01, 0.003, 0.001]
 /// ```
-fn fork(ctx: Context) -> TransientContext {
+pub fn fork(ctx: Context) -> TransientContext {
     let grid = match ctx.list_contexts("grid") {
         Some(params) => params,
         None => {
@@ -217,7 +227,7 @@ fn fork_pool(grid: Vec<Context>, pool: &Vec<CtxObj>) -> TransientContext {
 /// states:
 ///   from: postgresql://user:passwd@host/db
 /// ```
-fn vars(ctx: Context) -> TransientContext {
+pub fn vars(ctx: Context) -> TransientContext {
     if let Some(CtxObj::Context(ctx_states)) = ctx.get("states") {
         if let Some(CtxObj::Str(url)) = ctx_states.get("from") {
             // * may support both file & database in the future

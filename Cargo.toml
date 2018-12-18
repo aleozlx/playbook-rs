@@ -9,7 +9,6 @@ repository = "https://github.com/aleozlx/playbook-rs.git"
 
 [lib]
 name = "playbook_api"
-doc-private = true
 
 [features]
 base = []
