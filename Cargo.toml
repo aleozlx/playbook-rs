@@ -13,10 +13,26 @@ doc-private = true
 
 [features]
 base = []
+
+# Our people is a little biased towards Python, which seems fair.
 default = ["lang_python"]
+
+# Python language support
 lang_python = ["pyo3", "ymlctx/topyobject"]
+
+# Continuous Integration / Testing
 ci_only = [] # dummy feature because of https://github.com/rust-lang/rust/issues/45599
+
+# agent mode
+#   enables the --arg-resume command argument
 agent = []
+
+# emit API calls suitable for other infrastructures
+#   enables the --as command argument
+as_switch = []
+
+# Hotwings system: depends on k8s API Python client
+sys_hotwings = ["lang_python", "as_switch"]
 
 [dependencies]
 yaml-rust = "^0.4"
