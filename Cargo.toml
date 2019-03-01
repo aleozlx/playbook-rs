@@ -29,7 +29,8 @@ agent = []
 
 # emit API calls suitable for other infrastructures
 #   enables the --as command argument
-as_switch = []
+#   using a templating system "handlebars"
+as_switch = ["handlebars"]
 
 # Hotwings system: depends on k8s API Python client
 sys_hotwings = ["lang_python", "as_switch"]
@@ -51,6 +52,7 @@ serde_json = "1.0"
 serde = "^1.0.82"
 serde_derive = "^1.0.82"
 itertools = "^0.8.0"
+handlebars = { version = "^1.2.0", optional = true }
 
 [dev-dependencies]
 tempfile = "3.0.5"

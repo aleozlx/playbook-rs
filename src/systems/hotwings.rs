@@ -5,6 +5,7 @@ use regex::Regex;
 use nix::unistd::{fork, execvp, ForkResult};
 use nix::sys::wait::{waitpid, WaitStatus};
 use colored::Colorize;
+use handlebars::Handlebars;
 use ymlctx::context::{Context, CtxObj};
 use crate::{TaskError, TaskErrorSource};
 
@@ -16,7 +17,7 @@ use crate::{TaskError, TaskErrorSource};
 /// 
 /// > Note: the return value is for informational purposes only, the necessary K8s resources
 /// > would already have been provisioned.
-#[cfg(feature = "as_switch")]
+#[cfg(feature = "sys_hotwings")]
 pub fn hotwings_start<I, S>(ctx_docker: Context, cmd: I) -> Result<String, TaskError>
   where I: IntoIterator<Item = S>, S: AsRef<OsStr>
 {
@@ -37,23 +38,21 @@ pub fn hotwings_start<I, S>(ctx_docker: Context, cmd: I) -> Result<String, TaskE
     // crate::copy_user_info(&mut userinfo, &username);
     // let home = format!("/home/{}", &username);
 
-// * Sample yaml
-// ---
-// apiVersion: batch/v1
-// kind: Job
-// metadata:
-//   generateName: test-job-
-// spec:
-//   template:
-//     metadata:
-//       name: test_job
-//     spec:
-//       containers:
-//         - name: test
-//           image: busybox
-//           command: ["hostname"]
-//       restartPolicy: Never
-
-    
+    let mut hreg = Handlebars::new();
+    reg.register_template_string("batch-job", r#"---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  generateName: test-job-
+spec:
+  template:
+    metadata:
+      name: test_job
+    spec:
+      containers:
+        - name: test
+          image: busybox
+          command: ["hostname"]
+      restartPolicy: Never")?;"#;
 
 }
