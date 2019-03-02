@@ -54,7 +54,7 @@ spec:
     spec:
       containers:
         - name: test
-          image: busybox
+          image: {{ data.image.Str }}
           command: ["hostname"]
       restartPolicy: Never"#).unwrap();
     return renderer;
@@ -65,6 +65,8 @@ pub fn k8s_api<I, S>(ctx_docker: Context, cmd: I) -> Vec<String>
   where I: IntoIterator<Item = S>, S: AsRef<OsStr>
 {
     let mut renderer = get_renderer();
+    let a = renderer.render("batch-job", &ctx_docker).unwrap();
     let mut ret = Vec::new();
+    ret.push(a);
     return ret;
 }

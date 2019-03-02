@@ -1,6 +1,9 @@
 extern crate tempfile;
 extern crate playbook_api;
 
+#[cfg(feature = "as_switch")]
+extern crate handlebars;
+
 #[cfg(test)]
 mod test_containers {
     use std::io::prelude::*;
@@ -141,15 +144,62 @@ mod test_parallelism {
 }
 
 #[cfg(test)]
+#[cfg(feature = "as_switch")]
+mod test_as_switch {
+    use std::collections::BTreeMap;
+    use playbook_api::{Context, CtxObj};
+    use handlebars::Handlebars;
+
+    #[test]
+    fn template0() {
+        let mut renderer = Handlebars::new();
+        renderer.register_template_string("t0", "Hello {{msg}}");
+        let mut ctx = BTreeMap::new();
+        ctx.insert("msg", String::from("test"));
+        let out = renderer.render("t0", &ctx).unwrap();
+        assert_eq!(out, String::from("Hello test"))
+    }
+
+    #[test]
+    fn template1() {
+        let mut renderer = Handlebars::new();
+        // ref: https://github.com/aleozlx/ymlctx/blob/master/src/lib.rs
+        //      https://serde.rs/enum-representations.html        vvv  Enum external tagging
+        renderer.register_template_string("t0", "Hello {{data.msg.Str}}");
+        let ctx = Context::new().set("msg", CtxObj::Str(String::from("test")));
+        let out = renderer.render("t0", &ctx).unwrap();
+        assert_eq!(out, String::from("Hello test"))
+    }
+}
+
+#[cfg(test)]
+#[cfg(feature = "sys_hotwings")]
 mod test_hotwings {
     use playbook_api::{Context, CtxObj};
     use playbook_api::systems::hotwings;
+    // use handlebars::context::{Context};
 
     #[test]
-    fn hotwings_basic(){
+    fn hotwings_basic() {
         let raw = playbook_api::load_yaml("tests/test1/say_hi.yml").expect("Cannot load test playbook.");
         let ctx_docker = raw.subcontext("docker").unwrap();
+        println!("{}", ctx_docker);
         let cmd = vec![String::from("test")];
-        hotwings::k8s_api(ctx_docker, cmd);
+        let resources = hotwings::k8s_api(ctx_docker, cmd);
+        assert_eq!(resources[0], String::from(r#"---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  generateName: test-job-
+spec:
+  template:
+    metadata:
+      name: test_job
+    spec:
+      containers:
+        - name: test
+          image: aleozlx/playbook-test:test1
+          command: ["hostname"]
+      restartPolicy: Never"#))
     }
 }
