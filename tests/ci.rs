@@ -139,3 +139,17 @@ mod test_parallelism {
         }
     }
 }
+
+#[cfg(test)]
+mod test_hotwings {
+    use playbook_api::{Context, CtxObj};
+    use playbook_api::systems::hotwings;
+
+    #[test]
+    fn hotwings_basic(){
+        let raw = playbook_api::load_yaml("tests/test1/say_hi.yml").expect("Cannot load test playbook.");
+        let ctx_docker = raw.subcontext("docker").unwrap();
+        let cmd = vec![String::from("test")];
+        hotwings::k8s_api(ctx_docker, cmd);
+    }
+}

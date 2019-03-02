@@ -37,9 +37,12 @@ pub fn hotwings_start<I, S>(ctx_docker: Context, cmd: I) -> Result<String, TaskE
     // let mut userinfo = HashMap::new();
     // crate::copy_user_info(&mut userinfo, &username);
     // let home = format!("/home/{}", &username);
+    Ok(String::from("dummy"))
+}
 
-    let mut hreg = Handlebars::new();
-    reg.register_template_string("batch-job", r#"---
+fn get_renderer() -> Handlebars {
+    let mut renderer = Handlebars::new();
+    renderer.register_template_string("batch-job", r#"---
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -53,6 +56,15 @@ spec:
         - name: test
           image: busybox
           command: ["hostname"]
-      restartPolicy: Never")?;"#;
+      restartPolicy: Never"#).unwrap();
+    return renderer;
+}
 
+#[cfg(feature = "sys_hotwings")]
+pub fn k8s_api<I, S>(ctx_docker: Context, cmd: I) -> Vec<String>
+  where I: IntoIterator<Item = S>, S: AsRef<OsStr>
+{
+    let mut renderer = get_renderer();
+    let mut ret = Vec::new();
+    return ret;
 }
