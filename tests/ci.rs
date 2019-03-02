@@ -183,7 +183,9 @@ mod test_hotwings {
         let raw = playbook_api::load_yaml("tests/test1/say_hi.yml").expect("Cannot load test playbook.");
         let ctx_docker = raw.subcontext("docker").unwrap();
         let cmd = vec![String::from("hostname")];
-        let resources = hotwings::k8s_api(ctx_docker, cmd);
-        assert_eq!(resources[0], include_str!("fixtures/batch-basic.yml"))
+        match hotwings::k8s_api(ctx_docker, cmd) {
+            Ok(resources) => { assert_eq!(resources[0], include_str!("fixtures/batch-basic.yml")); }
+            Err(e) => { panic!("{}", e); }
+        }
     }
 }

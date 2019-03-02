@@ -5,7 +5,7 @@ use regex::Regex;
 use nix::unistd::{fork, execvp, ForkResult};
 use nix::sys::wait::{waitpid, WaitStatus};
 use colored::Colorize;
-use handlebars::Handlebars;
+use handlebars::{Handlebars, RenderError};
 use ymlctx::context::{Context, CtxObj};
 use crate::{TaskError, TaskErrorSource};
 
@@ -37,7 +37,14 @@ pub fn hotwings_start<I, S>(ctx_docker: Context, cmd: I) -> Result<String, TaskE
     // let mut userinfo = HashMap::new();
     // crate::copy_user_info(&mut userinfo, &username);
     // let home = format!("/home/{}", &username);
-    Ok(String::from("dummy"))
+
+    match k8s_api(ctx_docker, cmd) {
+        Ok(resources) => {
+            Ok(String::from("dummy"))
+        },
+        Err(e) => Err(TaskError { msg: e.desc, src: TaskErrorSource::Internal })
+    }
+    
 }
 
 fn get_renderer() -> Handlebars {
@@ -47,14 +54,14 @@ fn get_renderer() -> Handlebars {
 }
 
 #[cfg(feature = "sys_hotwings")]
-pub fn k8s_api<I, S>(ctx_docker: Context, cmd: I) -> Vec<String>
+pub fn k8s_api<I, S>(ctx_docker: Context, cmd: I) -> Result<Vec<String>, RenderError>
   where I: IntoIterator<Item = S>, S: AsRef<OsStr>
 {
     let mut renderer = get_renderer();
     let cmd_str: Vec<String> = cmd.into_iter().map(|s| s.as_ref().to_str().unwrap().to_owned()).collect();
-    let a = renderer.render("batch-job", &ctx_docker
-        .set("command_str", CtxObj::Str(format!("{:?}", cmd_str)))).unwrap();
-    let mut ret = Vec::new();
-    ret.push(a);
-    return ret;
+    let ctx_modded = ctx_docker
+        .set("command_str", CtxObj::Str(format!("{:?}", cmd_str)));
+    Ok(vec![
+        renderer.render("batch-job", &ctx_modded)?
+    ])
 }
