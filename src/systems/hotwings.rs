@@ -11,9 +11,9 @@ use crate::{TaskError, TaskErrorSource};
 
 /// Hotwings - a K8s+Celery powered job system
 /// 
-/// * `ctx_docker` is a docker context that contains spefications about the container
-/// * `cmd` is the command to run within the container
-/// * returns YAML file that provisions the job using the batch/v1 K8s API
+/// * `ctx_docker` @param a docker context that contains spefications about the container
+/// * `cmd` @param the command to run within the container
+/// * @returns YAML file that provisions the job using the batch/v1 K8s API
 /// 
 /// > Note: the return value is for informational purposes only, the necessary K8s resources
 /// > would already have been provisioned.
@@ -40,19 +40,26 @@ pub fn hotwings_start<I, S>(ctx_docker: Context, cmd: I) -> Result<String, TaskE
 
     match k8s_api(ctx_docker, cmd) {
         Ok(resources) => {
-            Ok(String::from("dummy"))
+            // TODO Use python API to provision resources
+            Ok(String::from(resources.join("\n")))
         },
         Err(e) => Err(TaskError { msg: e.desc, src: TaskErrorSource::Internal })
     }
     
 }
 
+/// Get the renderer with .hbs templates baked into the program
 fn get_renderer() -> Handlebars {
     let mut renderer = Handlebars::new();
     renderer.register_template_string("batch-job", include_str!("templates-hotwings/batch.hbs")).unwrap();
     return renderer;
 }
 
+/// Translate ctx_docker into K8s YAMLs
+/// 
+/// * `ctx_docker` @param a docker context that contains spefications about the container
+/// * `cmd` @param the command to run within the container
+/// * @returns a series of rendered YAMLs to be provisioned as resources, or a RenderError
 #[cfg(feature = "sys_hotwings")]
 pub fn k8s_api<I, S>(ctx_docker: Context, cmd: I) -> Result<Vec<String>, RenderError>
   where I: IntoIterator<Item = S>, S: AsRef<OsStr>
