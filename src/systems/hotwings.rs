@@ -42,21 +42,7 @@ pub fn hotwings_start<I, S>(ctx_docker: Context, cmd: I) -> Result<String, TaskE
 
 fn get_renderer() -> Handlebars {
     let mut renderer = Handlebars::new();
-    renderer.register_template_string("batch-job", r#"---
-apiVersion: batch/v1
-kind: Job
-metadata:
-  generateName: test-job-
-spec:
-  template:
-    metadata:
-      name: test_job
-    spec:
-      containers:
-        - name: test
-          image: {{ data.image.Str }}
-          command: ["hostname"]
-      restartPolicy: Never"#).unwrap();
+    renderer.register_template_string("batch-job", include_str!("templates-hotwings/batch.hbs")).unwrap();
     return renderer;
 }
 

@@ -177,7 +177,6 @@ mod test_as_switch {
 mod test_hotwings {
     use playbook_api::{Context, CtxObj};
     use playbook_api::systems::hotwings;
-    // use handlebars::context::{Context};
 
     #[test]
     fn hotwings_basic() {
@@ -186,20 +185,6 @@ mod test_hotwings {
         println!("{}", ctx_docker);
         let cmd = vec![String::from("test")];
         let resources = hotwings::k8s_api(ctx_docker, cmd);
-        assert_eq!(resources[0], String::from(r#"---
-apiVersion: batch/v1
-kind: Job
-metadata:
-  generateName: test-job-
-spec:
-  template:
-    metadata:
-      name: test_job
-    spec:
-      containers:
-        - name: test
-          image: aleozlx/playbook-test:test1
-          command: ["hostname"]
-      restartPolicy: Never"#))
+        assert_eq!(resources[0], include_str!("fixtures/batch-basic.yml"))
     }
 }

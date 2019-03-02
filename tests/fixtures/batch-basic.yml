@@ -1,0 +1,15 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  generateName: test-job-
+spec:
+  template:
+    metadata:
+      name: test_job
+    spec:
+      containers:
+        - name: test
+          image: aleozlx/playbook-test:test1
+          command: ["hostname"]
+      restartPolicy: Never
