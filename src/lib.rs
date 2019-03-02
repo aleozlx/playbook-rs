@@ -18,6 +18,9 @@ extern crate serde_json;
 #[cfg(feature = "lang_python")]
 extern crate pyo3;
 
+#[cfg(feature = "handlebars")]
+extern crate handlebars;
+
 pub use ymlctx::context::{Context, CtxObj};
 pub mod container;
 pub mod lang;
