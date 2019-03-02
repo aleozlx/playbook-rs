@@ -51,7 +51,9 @@ pub fn k8s_api<I, S>(ctx_docker: Context, cmd: I) -> Vec<String>
   where I: IntoIterator<Item = S>, S: AsRef<OsStr>
 {
     let mut renderer = get_renderer();
-    let a = renderer.render("batch-job", &ctx_docker).unwrap();
+    let cmd_str: Vec<String> = cmd.into_iter().map(|s| s.as_ref().to_str().unwrap().to_owned()).collect();
+    let a = renderer.render("batch-job", &ctx_docker
+        .set("command_str", CtxObj::Str(format!("{:?}", cmd_str)))).unwrap();
     let mut ret = Vec::new();
     ret.push(a);
     return ret;

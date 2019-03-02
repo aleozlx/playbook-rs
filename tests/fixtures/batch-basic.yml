@@ -2,14 +2,15 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  generateName: test-job-
+  generateName: batch-
+  namespace: bluecheese
 spec:
   template:
     metadata:
-      name: test_job
+      name: bluecheese
     spec:
       containers:
-        - name: test
+        - name: step
           image: aleozlx/playbook-test:test1
           command: ["hostname"]
       restartPolicy: Never
