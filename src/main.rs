@@ -76,7 +76,7 @@ fn main() {
             0 => None,
             v => Some(CtxObj::Int(v as i64))
         });
-    let mut playbook = Path::new(args.value_of("PLAYBOOK").unwrap()).to_path_buf();
+    let playbook = Path::new(args.value_of("PLAYBOOK").unwrap()).to_path_buf();
     if let Some(_) = ctx_args.get("arg-resume") {
         if !playbook_api::container::inside_docker() {
             error!("Context error: Not inside of a Docker container.");

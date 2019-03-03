@@ -1,10 +1,7 @@
-use std::ffi::{CString, OsStr};
-use std::collections::HashMap;
 use std::path::Path;
-use regex::Regex;
-use nix::unistd::{fork, execvp, ForkResult};
-use nix::sys::wait::{waitpid, WaitStatus};
-use colored::Colorize;
+use std::ffi::{CString, OsStr};
+// use regex::Regex;
+// use colored::Colorize;
 use handlebars::{Handlebars, RenderError};
 use ymlctx::context::{Context, CtxObj};
 use crate::{TaskError, TaskErrorSource};
@@ -40,12 +37,13 @@ pub fn hotwings_start<I, S>(ctx_docker: Context, cmd: I) -> Result<String, TaskE
 
     match k8s_api(ctx_docker, cmd) {
         Ok(resources) => {
-            // TODO Use python API to provision resources
-            Ok(String::from(resources.join("\n")))
+            match k8s_provisioner(&resources) {
+                Ok(()) => Ok(String::from(resources.join("\n"))),
+                Err(e) => Err(e)
+            }
         },
         Err(e) => Err(TaskError { msg: e.desc, src: TaskErrorSource::Internal })
     }
-    
 }
 
 /// Get the renderer with .hbs templates baked into the program
@@ -71,4 +69,38 @@ pub fn k8s_api<I, S>(ctx_docker: Context, cmd: I) -> Result<Vec<String>, RenderE
     Ok(vec![
         renderer.render("batch-job", &ctx_modded)?
     ])
+}
+
+#[cfg(feature = "lang_python")]
+use pyo3::prelude::*;
+
+#[cfg(feature = "lang_python")]
+pub fn k8s_provisioner(resources: &Vec<String>) -> Result<(), TaskError> {
+    let gil = Python::acquire_gil();
+    let py = gil.python();
+
+    let src_k8s_provisioner = include_str!("hotwings_k8s_api.py");
+    if let Ok(_) = py.run(&src_k8s_provisioner, None, None) {
+        let provisioner = py.eval("k8s_provisioner", None, None).unwrap();
+        for res in resources {
+            if let Ok(apicall) = py.eval(&format!(
+                "lambda: jobApi.create_namespaced_job(namespace, body=yaml.safe_load(\"\"\"{}\"\"\"), pretty='true')",
+                res
+            ), None, None) {
+                if let Err(api_exception) = provisioner.call1((apicall, )) {
+                    return Err(TaskError {
+                        msg: format!("{:?}", api_exception),
+                        src: TaskErrorSource::ExternalAPIError
+                    });
+                }
+            }
+        }
+        Ok(())
+    }
+    else {
+        Err(TaskError {
+            msg: String::from("An internal error has occurred sourcing the k8s provisioner script."),
+            src: TaskErrorSource::Internal
+        })
+    }
 }

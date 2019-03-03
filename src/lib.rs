@@ -4,7 +4,7 @@ extern crate log;
 #[macro_use]
 extern crate serde_derive;
 
-#[macro_use]
+// #[macro_use]
 extern crate itertools;
 
 extern crate yaml_rust;
@@ -45,7 +45,8 @@ pub enum TaskErrorSource {
     NixError(nix::Error),
     ExitCode(i32),
     Signal(nix::sys::signal::Signal),
-    Internal
+    Internal,
+    ExternalAPIError
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -149,7 +150,8 @@ fn invoke(src: Context, ctx_step: Context) -> Result<Context, ExitCode> {
                     TaskErrorSource::NixError(_) | TaskErrorSource::ExitCode(_) | TaskErrorSource::Signal(_) => {
                         Err(Some(format!("{}", e)))
                     },
-                    TaskErrorSource::Internal => Err(None)
+                    TaskErrorSource::Internal => Err(None),
+                    TaskErrorSource::ExternalAPIError => unreachable!()
                 }
             }
             else { Ok(()) };
@@ -305,7 +307,8 @@ fn run_step(ctx_step: Context, closure: Closure) -> TransientContext {
                                         TaskErrorSource::NixError(_) | TaskErrorSource::ExitCode(_) | TaskErrorSource::Signal(_) => {
                                             error!("{}: {}", "Container has crashed".red().bold(), e);
                                         },
-                                        TaskErrorSource::Internal => ()
+                                        TaskErrorSource::Internal => (),
+                                        TaskErrorSource::ExternalAPIError => unreachable!()
                                     }
                                     TransientContext::Diverging(ExitCode::ErrTask)
                                 }
