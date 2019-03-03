@@ -1,5 +1,6 @@
 #![allow(unused_imports)]
 #![cfg(feature = "as_switch")]
+#![cfg(feature = "sys_hotwings")]
 
 // use std::path::Path;
 use std::ffi::OsStr;
@@ -8,44 +9,49 @@ use std::ffi::OsStr;
 use handlebars::{Handlebars, RenderError};
 use ymlctx::context::{Context, CtxObj};
 use crate::{TaskError, TaskErrorSource};
+use super::Infrastructure;
 
 /// Hotwings - a K8s+Celery powered job system
-/// 
-/// * `ctx_docker` @param a docker context that contains spefications about the container
-/// * `cmd` @param the command to run within the container
-/// * @returns YAML file that provisions the job using the batch/v1 K8s API
-/// 
-/// > Note: the return value is for informational purposes only, the necessary K8s resources
-/// > would already have been provisioned.
-#[cfg(feature = "sys_hotwings")]
-pub fn hotwings_start<I, S>(ctx_docker: Context, cmd: I) -> Result<String, TaskError>
-  where I: IntoIterator<Item = S>, S: AsRef<OsStr>
-{
-    // TODO get user info by deserializing a file from the submission tgz
-    // let username;
-    // let output = std::process::Command::new("id").output().unwrap();
-    // let mut id_stdout = String::from_utf8_lossy(&output.stdout).into_owned();
-    // let newline_len = id_stdout.trim_right().len();
-    // id_stdout.truncate(newline_len);
-    // let rule = Regex::new(r"^uid=(?P<uid>[0-9]+)(\((?P<user>\w+)\))? gid=(?P<gid>[0-9]+)(\((?P<group>\w+)\))?").unwrap();
-    // if let Some(caps) = rule.captures(&id_stdout) {
-    //     username = caps.name("user").unwrap().as_str().to_owned();
-    // }
-    // else {
-    //     return Err(TaskError { msg: String::from("Failed to identify the user."), src: TaskErrorSource::Internal });
-    // }
-    // let mut userinfo = HashMap::new();
-    // crate::copy_user_info(&mut userinfo, &username);
-    // let home = format!("/home/{}", &username);
+pub struct Hotwings;
 
-    match k8s_api(ctx_docker, cmd) {
-        Ok(resources) => {
-            match k8s_provisioner(&resources) {
-                Ok(()) => Ok(String::from(resources.join("\n"))),
-                Err(e) => Err(e)
-            }
-        },
-        Err(e) => Err(TaskError { msg: e.desc, src: TaskErrorSource::Internal })
+impl Infrastructure for Hotwings {
+    /// Hotwings - a K8s+Celery powered job system
+    /// 
+    /// * `ctx_docker` @param a docker context that contains spefications about the container
+    /// * `cmd` @param the command to run within the container
+    /// * @returns YAML file that provisions the job using the batch/v1 K8s API
+    /// 
+    /// > Note: the return value is for informational purposes only, the necessary K8s resources
+    /// > would already have been provisioned.
+    fn start<I>(&self, ctx_docker: Context, cmd: I) -> Result<String, TaskError>
+      where I: IntoIterator, I::Item: AsRef<std::ffi::OsStr>
+    {
+        // TODO get user info by deserializing a file from the submission tgz
+        // let username;
+        // let output = std::process::Command::new("id").output().unwrap();
+        // let mut id_stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+        // let newline_len = id_stdout.trim_right().len();
+        // id_stdout.truncate(newline_len);
+        // let rule = Regex::new(r"^uid=(?P<uid>[0-9]+)(\((?P<user>\w+)\))? gid=(?P<gid>[0-9]+)(\((?P<group>\w+)\))?").unwrap();
+        // if let Some(caps) = rule.captures(&id_stdout) {
+        //     username = caps.name("user").unwrap().as_str().to_owned();
+        // }
+        // else {
+        //     return Err(TaskError { msg: String::from("Failed to identify the user."), src: TaskErrorSource::Internal });
+        // }
+        // let mut userinfo = HashMap::new();
+        // crate::copy_user_info(&mut userinfo, &username);
+        // let home = format!("/home/{}", &username);
+
+        match k8s_api(ctx_docker, cmd) {
+            Ok(resources) => {
+                match k8s_provisioner(&resources) {
+                    Ok(()) => Ok(String::from(resources.join("\n"))),
+                    Err(e) => Err(e)
+                }
+            },
+            Err(e) => Err(TaskError { msg: e.desc, src: TaskErrorSource::Internal })
+        }
     }
 }
 
@@ -61,7 +67,6 @@ fn get_renderer() -> Handlebars {
 /// * `ctx_docker` @param a docker context that contains spefications about the container
 /// * `cmd` @param the command to run within the container
 /// * @returns a series of rendered YAMLs to be provisioned as resources, or a RenderError
-#[cfg(feature = "sys_hotwings")]
 pub fn k8s_api<I, S>(ctx_docker: Context, cmd: I) -> Result<Vec<String>, RenderError>
   where I: IntoIterator<Item = S>, S: AsRef<OsStr>
 {

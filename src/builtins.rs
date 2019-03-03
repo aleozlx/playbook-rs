@@ -1,4 +1,4 @@
-use super::container;
+use crate::systems::docker;
 use std::path::Path;
 use colored::*;
 use yaml_rust::YamlLoader;
@@ -106,7 +106,7 @@ pub fn shell(ctx: Context) -> TransientContext {
                     _ => String::from("")
                 }
             }));
-            match container::docker_start(ctx_docker.hide("impersonate"), &["bash", "-c", &cmd]) {
+            match docker::start(ctx_docker.hide("impersonate"), &["bash", "-c", &cmd]) {
                 // Note: it is not secure to transition from the playbook to a shell, so "dynamic" impersonate is not an option
                 Ok(_) => {
                     TransientContext::Diverging(ExitCode::Success)
@@ -119,7 +119,7 @@ pub fn shell(ctx: Context) -> TransientContext {
         }
         else {
             warn!("{}", "Just a bash shell. Here goes nothing.".purple());
-            match container::docker_start(ctx_docker.set("interactive", CtxObj::Bool(true)).hide("impersonate"), &["bash"]) {
+            match docker::start(ctx_docker.set("interactive", CtxObj::Bool(true)).hide("impersonate"), &["bash"]) {
                 Ok(_) => {
                     TransientContext::Diverging(ExitCode::Success)
                 },

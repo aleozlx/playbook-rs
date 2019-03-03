@@ -7,6 +7,18 @@ use nix::sys::wait::{waitpid, WaitStatus};
 use colored::Colorize;
 use ymlctx::context::{Context, CtxObj};
 use crate::{TaskError, TaskErrorSource};
+use super::Infrastructure;
+
+/// Local docker service
+pub struct Docker;
+
+impl Infrastructure for Docker {
+    fn start<I>(&self, ctx_docker: Context, cmd: I) -> Result<String, TaskError>
+      where I: IntoIterator, I::Item: AsRef<std::ffi::OsStr>
+    {
+        start(ctx_docker, cmd)
+    }
+}
 
 pub fn inside_docker() -> bool {
     let status = std::process::Command::new("grep").args(&["-q", "docker", "/proc/1/cgroup"])
@@ -17,7 +29,7 @@ pub fn inside_docker() -> bool {
     }
 }
 
-pub fn docker_start<I, S>(ctx_docker: Context, cmd: I) -> Result<String, TaskError>
+pub fn start<I, S>(ctx_docker: Context, cmd: I) -> Result<String, TaskError>
   where I: IntoIterator<Item = S>, S: AsRef<OsStr>
 {
     let username;

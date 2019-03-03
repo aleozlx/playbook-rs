@@ -22,7 +22,6 @@ extern crate pyo3;
 extern crate handlebars;
 
 pub use ymlctx::context::{Context, CtxObj};
-pub mod container;
 pub mod lang;
 pub mod builtins;
 pub mod systems;
@@ -39,6 +38,7 @@ use yaml_rust::YamlLoader;
 use colored::*;
 use regex::Regex;
 use builtins::{TransientContext, ExitCode};
+use systems::Infrastructure;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TaskErrorSource {
@@ -298,20 +298,29 @@ fn run_step(ctx_step: Context, closure: Closure) -> TransientContext {
                                     resume_params.push(format!("-{}", "v".repeat(verbose)));
                                 }
                             }
-                            match container::docker_start(ctx_docker.clone(), resume_params) {
-                                Ok(_docker_cmd) => {
-                                    TransientContext::from(Ok(Context::new())) // TODO pass return value back as a context
-                                },
-                                Err(e) => {
-                                    match e.src {
-                                        TaskErrorSource::NixError(_) | TaskErrorSource::ExitCode(_) | TaskErrorSource::Signal(_) => {
-                                            error!("{}: {}", "Container has crashed".red().bold(), e);
-                                        },
-                                        TaskErrorSource::Internal => (),
-                                        TaskErrorSource::ExternalAPIError => unreachable!()
+                            if let Some(infrastructure) = systems::abstract_infrastructures(
+                                if let Some(CtxObj::Str(s)) = ctx_step.get("as-switch") { s }
+                                else { "docker" }
+                            ) {
+                                match infrastructure.start(ctx_docker.clone(), resume_params) {
+                                    Ok(_docker_cmd) => {
+                                        TransientContext::from(Ok(Context::new())) // TODO pass return value back as a context
+                                    },
+                                    Err(e) => {
+                                        match e.src {
+                                            TaskErrorSource::NixError(_) | TaskErrorSource::ExitCode(_) | TaskErrorSource::Signal(_) => {
+                                                error!("{}: {}", "Container has crashed".red().bold(), e);
+                                            },
+                                            TaskErrorSource::Internal => (),
+                                            TaskErrorSource::ExternalAPIError => unreachable!()
+                                        }
+                                        TransientContext::Diverging(ExitCode::ErrTask)
                                     }
-                                    TransientContext::Diverging(ExitCode::ErrTask)
                                 }
+                            }
+                            else {
+                                error!("Undefined infrastructure.");
+                                TransientContext::Diverging(ExitCode::ErrApp)
                             }
                         }
                         else {

@@ -90,7 +90,7 @@ fn main() {
         .set_opt("as-switch", map_arg!(args => AS_SWITCH));
     let playbook = Path::new(args.value_of("PLAYBOOK").unwrap()).to_path_buf();
     if let Some(_) = ctx_args.get("arg-resume") {
-        if !playbook_api::container::inside_docker() {
+        if !playbook_api::systems::docker::inside_docker() {
             error!("Context error: Not inside of a Docker container.");
             finalize(ExitCode::ErrApp);
         }
