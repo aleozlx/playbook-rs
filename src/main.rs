@@ -52,15 +52,26 @@ fn main() {
             (about: crate_description!())
             (@arg RESUME: --("arg-resume") +takes_value "For playbook-rs use ONLY: indicator that we have entered a container")
             (@arg ASSERT_VER: --("arg-version") +takes_value "For playbook-rs use ONLY: to ensure the binary versions match")
-            (@arg VERBOSE: --verbose -v ... "Log verbosity")
+            (@arg VERBOSE: --verbose -v ... "Logging verbosity")
             (@arg PLAYBOOK: +required "YAML playbook")
         ).get_matches();
     #[cfg(not(feature = "agent"))]
+    #[cfg(not(feature = "as_switch"))]
     let args = clap_app!(playbook =>
             (version: crate_version!())
             (author: crate_authors!())
             (about: crate_description!())
-            (@arg VERBOSE: --verbose -v ... "Log verbosity")
+            (@arg VERBOSE: --verbose -v ... "Logging verbosity")
+            (@arg PLAYBOOK: +required "YAML playbook")
+        ).get_matches();
+    #[cfg(not(feature = "agent"))]
+    #[cfg(feature = "as_switch")]
+    let args = clap_app!(playbook =>
+            (version: crate_version!())
+            (author: crate_authors!())
+            (about: crate_description!())
+            (@arg VERBOSE: --verbose -v ... "Logging verbosity")
+            (@arg AS_SWITCH: --as +takes_value "Call into other types of infrastructures")
             (@arg PLAYBOOK: +required "YAML playbook")
         ).get_matches();
     setup_logger(args.occurrences_of("VERBOSE")).expect("Logger Error.");
@@ -75,7 +86,8 @@ fn main() {
         .set_opt("verbose-fern", match args.occurrences_of("VERBOSE") {
             0 => None,
             v => Some(CtxObj::Int(v as i64))
-        });
+        })
+        .set_opt("as-switch", map_arg!(args => AS_SWITCH));
     let playbook = Path::new(args.value_of("PLAYBOOK").unwrap()).to_path_buf();
     if let Some(_) = ctx_args.get("arg-resume") {
         if !playbook_api::container::inside_docker() {
