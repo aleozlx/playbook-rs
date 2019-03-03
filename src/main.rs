@@ -45,6 +45,9 @@ macro_rules! map_arg {
 }
 
 fn main() {
+    #[cfg(all(feature = "sandbox", feature = "agent"))]
+    compile_error!("features `playbook/sandbox` and `playbook/agent` are mutually exclusive");
+
     #[cfg(feature = "agent")]
     let args = clap_app!(playbook =>
             (version: crate_version!())

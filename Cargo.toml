@@ -31,6 +31,9 @@ agent = []
 #   using a templating system "handlebars"
 as_switch = ["handlebars"]
 
+# disable host tasks, etc. See https://github.com/aleozlx/playbook-rs/issues/19
+sandbox = []
+
 # Hotwings system: depends on k8s API Python client
 sys_hotwings = ["lang_python", "as_switch"]
 

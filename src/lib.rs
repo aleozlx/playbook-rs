@@ -129,6 +129,7 @@ pub fn format_cmd<I>(cmd: I) -> String
 
 type TaskSpawner = fn(src: Context, ctx_step: Context) -> Result<(), TaskError>;
 
+#[cfg(not(feature = "sandbox"))] // protect the host by removing the entrance to all user codes!
 fn invoke(src: Context, ctx_step: Context) -> Result<Context, ExitCode> {
     let ref action: String = ctx_step.unpack("action").unwrap();
     let ref src_path_str: String = src.unpack("src").unwrap();
@@ -267,8 +268,12 @@ fn run_step(ctx_step: Context, closure: Closure) -> TransientContext {
                     }
                 };
                 if closure.container == 1 {
-                    show_step(true);
-                    TransientContext::from(invoke(ctx_source, ctx_step.hide("whitelist")))
+                    #[cfg(feature = "sandbox")] unreachable!();
+                    #[cfg(not(feature = "sandbox"))]
+                    {
+                        show_step(true);
+                        TransientContext::from(invoke(ctx_source, ctx_step.hide("whitelist")))
+                    }
                 }
                 else {
                     if let Some(ctx_docker) = ctx_step.subcontext("docker") {
@@ -329,8 +334,12 @@ fn run_step(ctx_step: Context, closure: Closure) -> TransientContext {
                         }
                     }
                     else {
-                        show_step(true);
-                        TransientContext::from(invoke(ctx_source, ctx_step.hide("whitelist")))
+                        #[cfg(feature = "sandbox")] unreachable!();
+                        #[cfg(not(feature = "sandbox"))]
+                        {
+                            show_step(true);
+                            TransientContext::from(invoke(ctx_source, ctx_step.hide("whitelist")))
+                        }
                     }
                 }
             },
