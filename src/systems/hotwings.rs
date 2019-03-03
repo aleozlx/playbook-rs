@@ -1,5 +1,8 @@
-use std::path::Path;
-use std::ffi::{CString, OsStr};
+#![allow(unused_imports)]
+#![cfg(feature = "as_switch")]
+
+// use std::path::Path;
+use std::ffi::OsStr;
 // use regex::Regex;
 // use colored::Colorize;
 use handlebars::{Handlebars, RenderError};
@@ -62,7 +65,7 @@ fn get_renderer() -> Handlebars {
 pub fn k8s_api<I, S>(ctx_docker: Context, cmd: I) -> Result<Vec<String>, RenderError>
   where I: IntoIterator<Item = S>, S: AsRef<OsStr>
 {
-    let mut renderer = get_renderer();
+    let renderer = get_renderer();
     let cmd_str: Vec<String> = cmd.into_iter().map(|s| s.as_ref().to_str().unwrap().to_owned()).collect();
     let ctx_modded = ctx_docker
         .set("command_str", CtxObj::Str(format!("{:?}", cmd_str)));

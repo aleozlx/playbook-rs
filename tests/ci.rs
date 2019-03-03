@@ -153,7 +153,7 @@ mod test_as_switch {
     #[test]
     fn template0() {
         let mut renderer = Handlebars::new();
-        renderer.register_template_string("t0", "Hello {{msg}}");
+        renderer.register_template_string("t0", "Hello {{msg}}").unwrap();
         let mut ctx = BTreeMap::new();
         ctx.insert("msg", String::from("test"));
         let out = renderer.render("t0", &ctx).unwrap();
@@ -165,7 +165,7 @@ mod test_as_switch {
         let mut renderer = Handlebars::new();
         // ref: https://github.com/aleozlx/ymlctx/blob/master/src/lib.rs
         //      https://serde.rs/enum-representations.html        vvv  Enum external tagging
-        renderer.register_template_string("t0", "Hello {{data.msg.Str}}");
+        renderer.register_template_string("t0", "Hello {{data.msg.Str}}").unwrap();
         let ctx = Context::new().set("msg", CtxObj::Str(String::from("test")));
         let out = renderer.render("t0", &ctx).unwrap();
         assert_eq!(out, String::from("Hello test"))
@@ -175,7 +175,6 @@ mod test_as_switch {
 #[cfg(test)]
 #[cfg(feature = "sys_hotwings")]
 mod test_hotwings {
-    use playbook_api::{Context, CtxObj};
     use playbook_api::systems::hotwings;
 
     #[test]
