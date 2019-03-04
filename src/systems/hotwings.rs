@@ -114,6 +114,8 @@ pub fn k8s_provisioner(resources: &Vec<String>) -> Result<(), TaskError> {
                     });
                 }
             }
+
+            // ! BUG wait for the job to finish!
         }
         Ok(())
     }
