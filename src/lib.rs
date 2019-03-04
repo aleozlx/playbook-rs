@@ -62,13 +62,13 @@ impl std::fmt::Display for TaskError {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-struct Closure {
+pub struct Closure {
     #[serde(rename = "c")]
     container: u8,
     #[serde(rename = "p")]
     step_ptr: usize,
     #[serde(rename = "s")]
-    ctx_states: Context,
+    pub ctx_states: Context,
 }
 
 #[test]

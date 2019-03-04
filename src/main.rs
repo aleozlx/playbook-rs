@@ -6,9 +6,11 @@ extern crate log;
 extern crate dirs;
 extern crate fern;
 extern crate chrono;
+extern crate colored;
 
 extern crate playbook_api;
 use std::path::Path;
+use colored::*;
 use playbook_api::{Context, CtxObj};
 use playbook_api::builtins::ExitCode;
 
@@ -91,7 +93,7 @@ fn main() {
             v => Some(CtxObj::Int(v as i64))
         })
         .set_opt("as-switch", map_arg!(args => AS_SWITCH));
-    let playbook = Path::new(args.value_of("PLAYBOOK").unwrap()).to_path_buf();
+    let mut playbook = Path::new(args.value_of("PLAYBOOK").unwrap()).to_path_buf();
     if let Some(_) = ctx_args.get("arg-resume") {
         // ! BUG this does not seem to apply to k8s containers??
         // if !playbook_api::systems::docker::inside_docker() {
@@ -104,6 +106,19 @@ fn main() {
                 Err(e) => {
                     error!("{}", e);
                     finalize(ExitCode::ErrSys);
+                }
+            }
+        }
+
+        if let Some(CtxObj::Str(closure_str)) = ctx_args.get("arg-resume") {
+            match serde_json::from_str::<playbook_api::Closure>(closure_str) {
+                Ok(closure) => {
+                    if let Some(CtxObj::Str(playbook_relocate)) = closure.ctx_states.get("playbook") {
+                        playbook = Path::new(playbook_relocate).to_path_buf();
+                    }
+                }
+                Err(_e) => {
+                    warn!("Unable to relocate playbook: Cannot parse the `--arg-resume` flag. {}", closure_str.underline());
                 }
             }
         }
