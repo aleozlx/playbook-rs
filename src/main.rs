@@ -114,6 +114,7 @@ fn main() {
             match serde_json::from_str::<playbook_api::Closure>(closure_str) {
                 Ok(closure) => {
                     if let Some(CtxObj::Str(playbook_relocate)) = closure.ctx_states.get("playbook") {
+                        debug!("Relocating playbook path to: {}", playbook_relocate);
                         playbook = Path::new(playbook_relocate).to_path_buf();
                     }
                 }
