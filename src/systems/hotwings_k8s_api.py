@@ -3,7 +3,10 @@ import os, sys, yaml, time
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
 
-config.load_incluster_config()
+try:
+    config.load_incluster_config()
+except:
+    config.load_kube_config()
 
 namespace = 'bluecheese'
 jobApi = client.BatchV1Api()

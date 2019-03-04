@@ -315,7 +315,9 @@ fn run_step(ctx_step: Context, closure: Closure) -> TransientContext {
                                             TaskErrorSource::NixError(_) | TaskErrorSource::ExitCode(_) | TaskErrorSource::Signal(_) => {
                                                 error!("{}: {}", "Container has crashed".red().bold(), e);
                                             },
-                                            TaskErrorSource::Internal => (),
+                                            TaskErrorSource::Internal => {
+                                                error!("{}: {}", "InternalError".red().bold(), e);
+                                            },
                                             TaskErrorSource::ExternalAPIError => {
                                                 error!("{}: {}", "ExternalAPIError".red().bold(), e);
                                             }

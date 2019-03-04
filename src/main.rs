@@ -93,10 +93,11 @@ fn main() {
         .set_opt("as-switch", map_arg!(args => AS_SWITCH));
     let playbook = Path::new(args.value_of("PLAYBOOK").unwrap()).to_path_buf();
     if let Some(_) = ctx_args.get("arg-resume") {
-        if !playbook_api::systems::docker::inside_docker() {
-            error!("Context error: Not inside of a Docker container.");
-            finalize(ExitCode::ErrApp);
-        }
+        // ! BUG this does not seem to apply to k8s containers??
+        // if !playbook_api::systems::docker::inside_docker() {
+        //     error!("Context error: Not inside of a Docker container.");
+        //     finalize(ExitCode::ErrApp);
+        // }
         if let Ok(ref become_id) = std::env::var("IMPERSONATE") {
             match impersonate::User::from_id(become_id).unwrap().su() {
                 Ok(()) => (),

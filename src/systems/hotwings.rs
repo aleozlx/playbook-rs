@@ -73,7 +73,7 @@ pub fn k8s_api<I, S>(ctx_docker: Context, cmd: I) -> Result<Vec<String>, RenderE
     let renderer = get_renderer();
     let cmd_str: Vec<String> = cmd.into_iter().map(|s| s.as_ref().to_str().unwrap().to_owned()).collect();
     let ctx_modded = ctx_docker
-        .set("command_str", CtxObj::Str(format!("{:?}", cmd_str)));
+        .set("command_str", CtxObj::Str(format!("[{}]", cmd_str.iter().map(|s| format!("'{}'", s)).collect::<Vec<String>>().join(","))));
     Ok(vec![
         renderer.render("batch-job", &ctx_modded)?
     ])
@@ -88,7 +88,14 @@ pub fn k8s_provisioner(resources: &Vec<String>) -> Result<(), TaskError> {
     let py = gil.python();
 
     let src_k8s_provisioner = include_str!("hotwings_k8s_api.py");
-    if let Ok(_) = py.run(&src_k8s_provisioner, None, None) {
+    if let Err(provisioner_err) = py.run(&src_k8s_provisioner, None, None) {
+        provisioner_err.print(py);
+        Err(TaskError {
+            msg: String::from("An internal error has occurred sourcing the k8s provisioner script."),
+            src: TaskErrorSource::Internal
+        })
+    }
+    else {
         let provisioner = py.eval("k8s_provisioner", None, None).unwrap();
         for res in resources {
             info!("Creating kubernetes resource:");
@@ -99,6 +106,8 @@ pub fn k8s_provisioner(resources: &Vec<String>) -> Result<(), TaskError> {
             ), None, None) {
                 if let Err(api_exception) = provisioner.call1((apicall, )) {
                     api_exception.print(py);
+                    // debug!("{:?}", api_exception.pvalue);
+                    // debug!("{}", api_exception.ptraceback);
                     return Err(TaskError {
                         msg: format!("An exception has occurred in the k8s provisioner script."),
                         src: TaskErrorSource::ExternalAPIError
@@ -107,11 +116,5 @@ pub fn k8s_provisioner(resources: &Vec<String>) -> Result<(), TaskError> {
             }
         }
         Ok(())
-    }
-    else {
-        Err(TaskError {
-            msg: String::from("An internal error has occurred sourcing the k8s provisioner script."),
-            src: TaskErrorSource::Internal
-        })
     }
 }

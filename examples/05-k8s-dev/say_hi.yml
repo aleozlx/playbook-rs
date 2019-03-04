@@ -2,7 +2,7 @@
 whitelist:
 - src: say_hi.py
 docker:
-  image: aleozlx/playbook-hello:0.3.2
+  image: aleozlx/playbook-hello-k8s:0.4.0
   impersonate: dynamic
   interactive: false
   vars:
