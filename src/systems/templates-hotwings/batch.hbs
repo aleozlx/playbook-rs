@@ -12,5 +12,6 @@ spec:
       containers:
         - name: step
           image: {{ data.image.Str }}
-          command: {{{ data.command_str.Str }}}
+          command: playbook
+          args: {{{ data.command_str.Str }}}
       restartPolicy: Never
