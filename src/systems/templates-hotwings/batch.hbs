@@ -32,3 +32,12 @@ spec:
           working_dir: /home/{{ data.hotwings_user.Str }}/current-ro
       restartPolicy: Never
   backoffLimit: 1
+{{!-- # refs:
+# https://github.com/kubernetes-client/python/blob/master/kubernetes/docs/CoreV1Api.md
+# https://github.com/kubernetes-client/python/blob/master/kubernetes/docs/BatchV1Api.md
+# https://github.com/kubernetes-client/python/blob/master/kubernetes/docs/V1Job.md
+# https://github.com/kubernetes-client/python/blob/master/kubernetes/docs/V1JobSpec.md
+# https://github.com/kubernetes-client/python/blob/master/kubernetes/docs/V1PodTemplateSpec.md
+# https://github.com/kubernetes-client/python/blob/master/kubernetes/docs/V1PodSpec.md
+# https://github.com/kubernetes-client/python/blob/master/kubernetes/docs/V1Container.md
+--}}
