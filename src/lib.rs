@@ -436,7 +436,7 @@ pub fn load_yaml<P: AsRef<Path>>(playbook: P) -> Result<Context, ExitCode> {
     let contents = match read_contents(fname) {
         Ok(v) => v,
         Err(e) => {
-            error!("IO Error: {}", e);
+            error!("IO Error (while loading the playbook {:?}): {}", playbook.as_ref(), e);
             return Err(ExitCode::ErrSys);
         }
     };

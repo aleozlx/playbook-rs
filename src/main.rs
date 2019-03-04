@@ -94,7 +94,7 @@ fn main() {
         })
         .set_opt("as-switch", map_arg!(args => AS_SWITCH));
     let mut playbook = Path::new(args.value_of("PLAYBOOK").unwrap()).to_path_buf();
-    if let Some(_) = ctx_args.get("arg-resume") {
+    if let Some(CtxObj::Str(closure_str)) = ctx_args.get("arg-resume") {
         // ! BUG this does not seem to apply to k8s containers??
         // if !playbook_api::systems::docker::inside_docker() {
         //     error!("Context error: Not inside of a Docker container.");
@@ -110,17 +110,15 @@ fn main() {
             }
         }
 
-        if let Some(CtxObj::Str(closure_str)) = ctx_args.get("arg-resume") {
-            match serde_json::from_str::<playbook_api::Closure>(closure_str) {
-                Ok(closure) => {
-                    if let Some(CtxObj::Str(playbook_relocate)) = closure.ctx_states.get("playbook") {
-                        debug!("Relocating playbook path to: {}", playbook_relocate);
-                        playbook = Path::new(playbook_relocate).to_path_buf();
-                    }
+        match serde_json::from_str::<playbook_api::Closure>(closure_str) {
+            Ok(closure) => {
+                if let Some(CtxObj::Str(playbook_relocate)) = closure.ctx_states.get("playbook") {
+                    debug!("Relocating playbook path to: {}", playbook_relocate);
+                    playbook = Path::new(playbook_relocate).to_path_buf();
                 }
-                Err(_e) => {
-                    warn!("Unable to relocate playbook: Cannot parse the `--arg-resume` flag. {}", closure_str.underline());
-                }
+            }
+            Err(_e) => {
+                warn!("Unable to relocate playbook: Cannot parse the `--arg-resume` flag. {}", closure_str.underline());
             }
         }
     }
