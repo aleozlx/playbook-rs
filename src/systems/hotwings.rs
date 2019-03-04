@@ -98,8 +98,9 @@ pub fn k8s_provisioner(resources: &Vec<String>) -> Result<(), TaskError> {
                 res
             ), None, None) {
                 if let Err(api_exception) = provisioner.call1((apicall, )) {
+                    api_exception.print(py);
                     return Err(TaskError {
-                        msg: format!("{:?}", api_exception),
+                        msg: format!("An exception has occurred in the k8s provisioner script."),
                         src: TaskErrorSource::ExternalAPIError
                     });
                 }
