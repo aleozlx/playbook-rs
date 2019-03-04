@@ -306,7 +306,7 @@ fn run_step(ctx_step: Context, closure: Closure) -> TransientContext {
                             let infrastructure_str = if let Some(CtxObj::Str(s)) = ctx_step.get("as-switch") { s } else { "docker" };
                             info!("Selected infrastructure: {}", infrastructure_str);
                             if let Some(infrastructure) = systems::abstract_infrastructures(&infrastructure_str) {
-                                match infrastructure.start(ctx_docker.clone(), resume_params) {
+                                match infrastructure.start(ctx_docker.set_opt("playbook-from", ctx_step.get_clone("playbook")), resume_params) {
                                     Ok(_docker_cmd) => {
                                         TransientContext::from(Ok(Context::new())) // TODO pass return value back as a context
                                     },

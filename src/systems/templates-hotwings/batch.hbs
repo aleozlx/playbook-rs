@@ -9,11 +9,26 @@ spec:
     metadata:
       name: bluecheese
     spec:
+      volumes:
+        - name: public-ro
+          persistentVolumeClaim:
+            claimName: public-ro-claim
+        - name: current-ro
+          persistentVolumeClaim:
+            claimName: current-ro-claim-{{ data.hotwings_task_id.Str }}
       containers:
         - name: step
           image: {{ data.image.Str }}
           command: ["playbook"]
           args: {{{ data.command_str.Str }}}
           imagePullPolicy: Always
+          volumeMounts:
+          - name: public-ro
+            mountPath: /data/public-ro
+            readOnly: true
+          - name: current-ro
+            mountPath: /home/{{ data.hotwings_user.Str }}/current-ro
+            readOnly: true
+          working_dir: /home/{{ data.hotwings_user.Str }}/current-ro
       restartPolicy: Never
   backoffLimit: 1

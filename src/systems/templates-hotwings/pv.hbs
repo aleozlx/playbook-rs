@@ -1,0 +1,23 @@
+---
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: current-ro-{{ data.hotwings_task_id.Str }}
+  namespace: bluecheese
+spec:
+  capacity:
+    storage: 100Mi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadOnlyMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: slow
+  mountOptions:
+    - hard
+    - nfsvers=4
+  nfs:
+    path: /hotwings/current-ro/{{ data.hotwings_task_id.Str }}
+    server: 172.16.200.161
+  claimRef:
+    namespace: bluecheese
+    name: current-ro-claim-{{ data.hotwings_task_id.Str }}

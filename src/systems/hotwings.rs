@@ -2,7 +2,7 @@
 #![cfg(feature = "as_switch")]
 #![cfg(feature = "sys_hotwings")]
 
-// use std::path::Path;
+use std::path::Path;
 use std::ffi::OsStr;
 // use regex::Regex;
 // use colored::Colorize;
@@ -27,6 +27,8 @@ impl Infrastructure for Hotwings {
       where I: IntoIterator, I::Item: AsRef<std::ffi::OsStr>
     {
         // TODO get user info by deserializing a file from the submission tgz
+        let username = "hotwings";
+
         // let username;
         // let output = std::process::Command::new("id").output().unwrap();
         // let mut id_stdout = String::from_utf8_lossy(&output.stdout).into_owned();
@@ -41,12 +43,16 @@ impl Infrastructure for Hotwings {
         // }
         // let mut userinfo = HashMap::new();
         // crate::copy_user_info(&mut userinfo, &username);
-        // let home = format!("/home/{}", &username);
+        let home = format!("/home/{}", &username);
+        let playbook_from: String = ctx_docker.unpack("playbook-from").unwrap();
+        let ctx_modded = ctx_docker
+            .set("hotwings_user", CtxObj::Str(username.to_owned()))
+            .set("hotwings_task_id", CtxObj::Str(get_task_id(&playbook_from)));
 
-        match k8s_api(ctx_docker, cmd) {
+        match k8s_api(ctx_modded, cmd) {
             Ok(resources) => {
                 match k8s_provisioner(&resources) {
-                    Ok(()) => Ok(String::from(resources.join("\n"))),
+                    Ok(()) => Ok(String::from(resources.iter().map(|(api, res)| res as &str).collect::<Vec<&str>>().join("\n"))),
                     Err(e) => Err(e)
                 }
             },
@@ -55,10 +61,23 @@ impl Infrastructure for Hotwings {
     }
 }
 
+/// Get task id from playbook path
+/// 
+/// **Example**
+/// ```text
+/// /data/current-ro/0a6178f6-098d-4059-aaf0-9b6e0ea628d8/hello_inpod.yml
+///   => 0a6178f6-098d-4059-aaf0-9b6e0ea628d8
+/// ```
+fn get_task_id<P: AsRef<Path>>(playbook: P) -> String {
+    playbook.as_ref().parent().unwrap().file_name().unwrap().to_string_lossy().to_string()
+}
+
 /// Get the renderer with .hbs templates baked into the program
 fn get_renderer() -> Handlebars {
     let mut renderer = Handlebars::new();
     renderer.register_template_string("batch-job", include_str!("templates-hotwings/batch.hbs")).unwrap();
+    renderer.register_template_string("pv-current-ro", include_str!("templates-hotwings/pv.hbs")).unwrap();
+    renderer.register_template_string("pvc-current-ro", include_str!("templates-hotwings/pvc.hbs")).unwrap();
     return renderer;
 }
 
@@ -67,7 +86,7 @@ fn get_renderer() -> Handlebars {
 /// * `ctx_docker` @param a docker context that contains spefications about the container
 /// * `cmd` @param the command to run within the container
 /// * @returns a series of rendered YAMLs to be provisioned as resources, or a RenderError
-pub fn k8s_api<I, S>(ctx_docker: Context, cmd: I) -> Result<Vec<String>, RenderError>
+pub fn k8s_api<I, S>(ctx_docker: Context, cmd: I) -> Result<Vec<(String, String)>, RenderError>
   where I: IntoIterator<Item = S>, S: AsRef<OsStr>
 {
     let renderer = get_renderer();
@@ -75,7 +94,9 @@ pub fn k8s_api<I, S>(ctx_docker: Context, cmd: I) -> Result<Vec<String>, RenderE
     let ctx_modded = ctx_docker
         .set("command_str", CtxObj::Str(format!("[{}]", cmd_str.iter().map(|s| format!("'{}'", s)).collect::<Vec<String>>().join(","))));
     Ok(vec![
-        renderer.render("batch-job", &ctx_modded)?
+        (String::from("api_pv"), renderer.render("pv-current-ro", &ctx_modded)?),
+        (String::from("api_pvc"), renderer.render("pvc-current-ro", &ctx_modded)?),
+        (String::from("api_job"), renderer.render("batch-job", &ctx_modded)?),
     ])
 }
 
@@ -83,7 +104,7 @@ pub fn k8s_api<I, S>(ctx_docker: Context, cmd: I) -> Result<Vec<String>, RenderE
 use pyo3::prelude::*;
 
 #[cfg(feature = "lang_python")]
-pub fn k8s_provisioner(resources: &Vec<String>) -> Result<(), TaskError> {
+pub fn k8s_provisioner(resources: &Vec<(String, String)>) -> Result<(), TaskError> {
     let gil = Python::acquire_gil();
     let py = gil.python();
 
@@ -97,25 +118,22 @@ pub fn k8s_provisioner(resources: &Vec<String>) -> Result<(), TaskError> {
     }
     else {
         let provisioner = py.eval("k8s_provisioner", None, None).unwrap();
-        for res in resources {
+        for (api, res) in resources {
             info!("Creating kubernetes resource:");
             info!("{}", res);
-            if let Ok(apicall) = py.eval(&format!(
-                "lambda: jobApi.create_namespaced_job(namespace, body=yaml.safe_load(\"\"\"{}\"\"\"), pretty='true')",
-                res
-            ), None, None) {
-                if let Err(api_exception) = provisioner.call1((apicall, )) {
-                    api_exception.print(py);
-                    // debug!("{:?}", api_exception.pvalue);
-                    // debug!("{}", api_exception.ptraceback);
-                    return Err(TaskError {
-                        msg: format!("An exception has occurred in the k8s provisioner script."),
-                        src: TaskErrorSource::ExternalAPIError
-                    });
-                }
+            if let Err(api_exception) = provisioner.call1((api, res)) {
+                api_exception.print(py);
+                return Err(TaskError {
+                    msg: format!("An exception has occurred in the k8s provisioner script."),
+                    src: TaskErrorSource::ExternalAPIError
+                });
             }
 
+            if api == api_job {
             // ! BUG wait for the job to finish!
+            }
+
+            // TODO shouldn't clean up pv/pvc per step but we will need to do that at some point.
         }
         Ok(())
     }
