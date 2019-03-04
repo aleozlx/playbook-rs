@@ -12,6 +12,6 @@ spec:
       containers:
         - name: step
           image: aleozlx/playbook-test:test1
-          command: playbook
+          command: ["playbook"]
           args: ["main.yml"]
       restartPolicy: Never
