@@ -92,7 +92,7 @@ pub fn k8s_provisioner(resources: &Vec<String>) -> Result<(), TaskError> {
         let provisioner = py.eval("k8s_provisioner", None, None).unwrap();
         for res in resources {
             info!("Creating kubernetes resource:");
-            info!(res);
+            info!("{}", res);
             if let Ok(apicall) = py.eval(&format!(
                 "lambda: jobApi.create_namespaced_job(namespace, body=yaml.safe_load(\"\"\"{}\"\"\"), pretty='true')",
                 res
