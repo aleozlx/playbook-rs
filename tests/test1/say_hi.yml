@@ -5,7 +5,7 @@ docker:
   image: aleozlx/playbook-test:test1
   impersonate: dynamic
   interactive: false
-message: Hello World
 steps:
 - name: Running in a container
   action: say_hi
+  message: Hello World

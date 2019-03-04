@@ -303,10 +303,9 @@ fn run_step(ctx_step: Context, closure: Closure) -> TransientContext {
                                     resume_params.push(format!("-{}", "v".repeat(verbose)));
                                 }
                             }
-                            if let Some(infrastructure) = systems::abstract_infrastructures(
-                                if let Some(CtxObj::Str(s)) = ctx_step.get("as-switch") { s }
-                                else { "docker" }
-                            ) {
+                            let infrastructure_str = if let Some(CtxObj::Str(s)) = ctx_step.get("as-switch") { s } else { "docker" };
+                            info!("Selected infrastructure: {}", infrastructure_str);
+                            if let Some(infrastructure) = systems::abstract_infrastructures(&infrastructure_str) {
                                 match infrastructure.start(ctx_docker.clone(), resume_params) {
                                     Ok(_docker_cmd) => {
                                         TransientContext::from(Ok(Context::new())) // TODO pass return value back as a context
@@ -317,7 +316,9 @@ fn run_step(ctx_step: Context, closure: Closure) -> TransientContext {
                                                 error!("{}: {}", "Container has crashed".red().bold(), e);
                                             },
                                             TaskErrorSource::Internal => (),
-                                            TaskErrorSource::ExternalAPIError => unreachable!()
+                                            TaskErrorSource::ExternalAPIError => {
+                                                error!("{}: {}", "ExternalAPIError".red().bold(), e);
+                                            }
                                         }
                                         TransientContext::Diverging(ExitCode::ErrTask)
                                     }
