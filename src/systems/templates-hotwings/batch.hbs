@@ -22,6 +22,9 @@ spec:
           command: ["playbook"]
           args: {{{ data.command_str.Str }}}
           imagePullPolicy: Always
+          env:
+          - name: PYTHONUNBUFFERED
+            value: "1"
           volumeMounts:
           #- name: public-ro
           #  mountPath: /data/public-ro
