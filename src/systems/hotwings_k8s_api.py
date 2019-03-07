@@ -13,13 +13,30 @@ coreV1Api = client.CoreV1Api()
 jobApi = client.BatchV1Api()
 
 def api_job(body):
-    jobApi.create_namespaced_job(namespace, body=yaml.safe_load(body), pretty='true')
-
+    return jobApi.create_namespaced_job(namespace, body=yaml.safe_load(body), pretty='true')
+    
 def api_pv(body):
-    coreV1Api.create_persistent_volume(body=yaml.safe_load(body), pretty='true')
+    return coreV1Api.create_persistent_volume(body=yaml.safe_load(body), pretty='true')
 
 def api_pvc(body):
-    coreV1Api.create_namespaced_persistent_volume_claim(namespace, body=yaml.safe_load(body), pretty='true')
+    return coreV1Api.create_namespaced_persistent_volume_claim(namespace, body=yaml.safe_load(body), pretty='true')
+
+def get_pods(job_spec):
+    prefix = job_spec.metadata.labels["job-name"]
+    return list(filter(lambda pod: pod.metadata.name.startswith(prefix), coreV1Api.list_namespaced_pod(namespace).items))
+
+def get_pods_status(pods):
+    return { pod.metadata.name: pod.status.phase for pod in pods }
+
+def join_job(job_spec):
+    # possible pod phases: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-phase
+    terminal_phases = set(['Succeeded', 'Failed', 'Unknown', 'Completed'])
+    refresh = lambda: get_pods_status(get_pods(job_spec))
+    states = refresh()
+    while not all((s in terminal_phases) for s in states.values()):
+        print(states, file=sys.stderr)
+        time.sleep(3)
+        states = refresh()
 
 def k8s_provisioner(apicall, body):
     globals()[apicall](body) # passing through any exceptions to playbook-rs

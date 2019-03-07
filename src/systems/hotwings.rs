@@ -118,20 +118,31 @@ pub fn k8s_provisioner(resources: &Vec<(String, String)>) -> Result<(), TaskErro
     }
     else {
         let provisioner = py.eval("k8s_provisioner", None, None).unwrap();
+        let join_job = py.eval("join_job", None, None).unwrap();
         for (api, res) in resources {
             info!("Creating kubernetes resource:");
             info!("{}", res);
-            if let Err(api_exception) = provisioner.call1((api, res)) {
-                api_exception.print(py);
-                return Err(TaskError {
-                    msg: format!("An exception has occurred in the k8s provisioner script."),
-                    src: TaskErrorSource::ExternalAPIError
-                });
+            match provisioner.call1((api, res)) {
+                Ok(api_return) => {
+                    if api == "api_job" { // api_return is actually a job spec obj. Use that to join.
+                        if let Err(join_exception) = join_job.call1((api_return, )) {
+                            join_exception.print(py);
+                            return Err(TaskError {
+                                msg: format!("An exception has occurred while joining the job execution."),
+                                src: TaskErrorSource::ExternalAPIError
+                            });
+                        }
+                    }
+                },
+                Err(api_exception) => {
+                    api_exception.print(py);
+                    return Err(TaskError {
+                        msg: format!("An exception has occurred in the k8s provisioner script."),
+                        src: TaskErrorSource::ExternalAPIError
+                    });
+                }
             }
 
-            if api == api_job {
-            // ! BUG wait for the job to finish!
-            }
 
             // TODO shouldn't clean up pv/pvc per step but we will need to do that at some point.
         }
