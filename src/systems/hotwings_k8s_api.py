@@ -27,7 +27,9 @@ def api_pvc(body):
 
 def get_pods(job_spec):
     prefix = job_spec.metadata.labels["job-name"]
-    return list(filter(lambda pod: pod.metadata.name.startswith(prefix), coreV1Api.list_namespaced_pod(namespace).items))
+    logger.debug('job-prefix=%s')
+    return list(filter(lambda pod: pod.metadata.name.startswith(prefix),
+        coreV1Api.list_namespaced_pod(namespace, include_uninitialized=True).items))
 
 def get_pods_status(pods):
     return { pod.metadata.name: pod.status.phase for pod in pods }
