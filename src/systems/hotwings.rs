@@ -126,9 +126,13 @@ pub fn k8s_provisioner(resources: &Vec<(String, String)>) -> Result<(), TaskErro
                 Ok(api_return) => {
                     if api == "api_job" { // api_return is actually a job spec obj. Use that to join.
                         if let Err(join_exception) = join_job.call1((api_return, )) {
-                            // join_exception.print(py);
+                            join_exception.print_and_set_sys_last_vars(py);
+                            match py.run("sys.stderr.flush()", None, None) {
+                                Ok(_) => {}
+                                Err(_) => {}
+                            }
                             return Err(TaskError {
-                                msg: format!("An exception has occurred while joining the job execution. {:?}", join_exception),
+                                msg: format!("An exception has occurred while joining the job execution."),
                                 src: TaskErrorSource::ExternalAPIError
                             });
                         }

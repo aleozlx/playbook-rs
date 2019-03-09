@@ -39,8 +39,8 @@ def join_job(job_spec):
             time.sleep(3)
             states = refresh()
     except Exception as e:
-        print(e, flush=True)
-        print(e, file=sys.stderr, flush=True)
+        print('stdout', e, flush=True)
+        print('stderr', e, file=sys.stderr, flush=True)
         raise
 
 def k8s_provisioner(apicall, body):

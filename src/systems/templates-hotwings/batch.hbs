@@ -10,9 +10,9 @@ spec:
       name: bluecheese
     spec:
       volumes:
-        #- name: public-ro
-        #  persistentVolumeClaim:
-        #    claimName: public-ro-claim
+        - name: public-ro
+          persistentVolumeClaim:
+            claimName: public-ro-claim
         - name: current-ro
           persistentVolumeClaim:
             claimName: current-ro-claim-{{ data.hotwings_task_id.Str }}
@@ -26,9 +26,9 @@ spec:
           - name: PYTHONUNBUFFERED
             value: "1"
           volumeMounts:
-          #- name: public-ro
-          #  mountPath: /data/public-ro
-          #  readOnly: true
+          - name: public-ro
+            mountPath: /data/public-ro
+            readOnly: true
           - name: current-ro
             mountPath: /home/{{ data.hotwings_user.Str }}/current-ro
             readOnly: true
