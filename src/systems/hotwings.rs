@@ -110,7 +110,7 @@ pub fn k8s_provisioner(resources: &Vec<(String, String)>) -> Result<(), TaskErro
 
     let src_k8s_provisioner = include_str!("hotwings_k8s_api.py");
     if let Err(provisioner_err) = py.run(&src_k8s_provisioner, None, None) {
-        provisioner_err.print(py);
+        provisioner_err.print_and_set_sys_last_vars(py);
         Err(TaskError {
             msg: String::from("An internal error has occurred sourcing the k8s provisioner script."),
             src: TaskErrorSource::Internal
@@ -139,7 +139,7 @@ pub fn k8s_provisioner(resources: &Vec<(String, String)>) -> Result<(), TaskErro
                     }
                 },
                 Err(api_exception) => {
-                    api_exception.print(py);
+                    api_exception.print_and_set_sys_last_vars(py);
                     return Err(TaskError {
                         msg: format!("An exception has occurred in the k8s provisioner script."),
                         src: TaskErrorSource::ExternalAPIError

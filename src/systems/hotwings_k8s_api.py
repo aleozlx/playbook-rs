@@ -29,19 +29,14 @@ def get_pods_status(pods):
     return { pod.metadata.name: pod.status.phase for pod in pods }
 
 def join_job(job_spec):
-    try:
-        # possible pod phases: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-phase
-        terminal_phases = set(['Succeeded', 'Failed', 'Unknown', 'Completed'])
-        refresh = lambda: get_pods_status(get_pods(job_spec))
+    # possible pod phases: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-phase
+    terminal_phases = set(['Succeeded', 'Failed', 'Unknown', 'Completed'])
+    refresh = lambda: get_pods_status(get_pods(job_spec))
+    states = refresh()
+    while not all((s in terminal_phases) for s in states.values()):
+        print(states, file=sys.stderr)
+        time.sleep(3)
         states = refresh()
-        while not all((s in terminal_phases) for s in states.values()):
-            print(states, file=sys.stderr)
-            time.sleep(3)
-            states = refresh()
-    except Exception as e:
-        print('stdout', e, flush=True)
-        print('stderr', e, file=sys.stderr, flush=True)
-        raise
 
 def k8s_provisioner(apicall, body):
-    globals()[apicall](body) # passing through any exceptions to playbook-rs
+    return globals()[apicall](body) # passing through any exceptions to playbook-rs
