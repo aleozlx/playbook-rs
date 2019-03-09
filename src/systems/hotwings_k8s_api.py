@@ -27,7 +27,7 @@ def api_pvc(body):
 
 def get_pods(job_spec):
     prefix = job_spec.metadata.labels["job-name"]
-    logger.debug('job-prefix=%s')
+    logger.debug('job-prefix=%s', prefix)
     return list(filter(lambda pod: pod.metadata.name.startswith(prefix),
         coreV1Api.list_namespaced_pod(namespace, include_uninitialized=True).items))
 
@@ -43,6 +43,7 @@ def join_job(job_spec):
     logger.debug('init states: %s', states)
     while not all((s in terminal_phases) for s in states.values()):
         logger.debug(states)
+        # TODO Exponential backoff up to 10min
         time.sleep(3)
         states = refresh()
     logger.debug('final states %s', states)
