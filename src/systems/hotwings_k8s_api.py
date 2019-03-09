@@ -1,7 +1,11 @@
 # pylint: disable=import-error,no-name-in-module
-import os, sys, yaml, time
+import os, sys, yaml, time, logging
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
+
+logging.basicConfig(format='[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s')
+logger = logging.getLogger('k8sApi')
+logger.setLevel(logging.DEBUG)
 
 try:
     config.load_incluster_config()
@@ -32,14 +36,14 @@ def join_job(job_spec):
     # possible pod phases: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-phase
     terminal_phases = set(['Succeeded', 'Failed', 'Unknown', 'Completed'])
     refresh = lambda: get_pods_status(get_pods(job_spec))
-    print('hotwings_k8s_api.py/join_job()', file=sys.stderr, flush=True)
+    logger.debug('hotwings_k8s_api.py/join_job()')
     states = refresh()
-    print('init states', states, file=sys.stderr, flush=True)
+    logger.debug('init states: %s', states)
     while not all((s in terminal_phases) for s in states.values()):
-        print(states, file=sys.stderr, flush=True)
+        logger.debug(states)
         time.sleep(3)
         states = refresh()
-    print('final states', states, file=sys.stderr, flush=True)
+    logger.debug('final states %s', states)
 
 def k8s_provisioner(apicall, body):
     return globals()[apicall](body) # passing through any exceptions to playbook-rs
