@@ -41,7 +41,8 @@ def join_job(job_spec):
     logger.debug('hotwings_k8s_api.py/join_job()')
     states = refresh()
     logger.debug('init states: %s', states)
-    while not all((s in terminal_phases) for s in states.values()):
+    #     vvv hold if none is found because they may not be initialized yet
+    while len(states.values()) == 0 or not all((s in terminal_phases) for s in states.values()):
         logger.debug(states)
         # TODO Exponential backoff up to 10min
         time.sleep(3)
