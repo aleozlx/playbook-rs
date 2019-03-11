@@ -2,6 +2,7 @@ use std::path::Path;
 use std::result::Result;
 use ymlctx::context::{Context, CtxObj};
 use crate::{TaskError, TaskErrorSource};
+use std::io::Write; // for flushing stdio
 
 #[cfg(feature = "lang_python")]
 use pyo3::prelude::*;
@@ -9,12 +10,12 @@ use pyo3::prelude::*;
 use pyo3::types::PyList;
 
 /// Flush stdout & stderr
+#[allow(unused_must_use)]
 #[cfg(feature = "lang_python")]
 fn flush_stdio(py: pyo3::Python) {
-    match py.run("sys.stdout.flush(); sys.stderr.flush()", None, None) {
-        Ok(_) => {}
-        Err(_) => {}
-    }
+    py.run("sys.stderr.flush(); sys.stdout.flush()", None, None);
+    std::io::stderr().flush();
+    std::io::stdout().flush();
 }
 
 #[cfg(feature = "lang_python")]

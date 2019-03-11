@@ -30,7 +30,7 @@ use std::str;
 use std::path::Path;
 use std::fs::File;
 use std::io::prelude::*;
-use std::io::BufReader;
+use std::io::{BufReader, Write};
 use std::collections::HashMap;
 use std::result::Result;
 use std::collections::HashSet;
@@ -137,6 +137,10 @@ fn invoke(src: Context, ctx_step: Context) -> Result<Context, ExitCode> {
         eprintln!("{}", "== Context ======================".cyan());
         eprintln!("# ctx({}@{}) =\n{}", action.cyan(), src_path_str.dimmed(), ctx_step);
         eprintln!("{}", "== EOF ==========================".cyan());
+        match std::io::stderr().flush() {
+            Ok(_) => {},
+            Err(_) => {}
+        }
     }
     let src_path = Path::new(src_path_str);
     if let Some(ext_os) = src_path.extension() {
@@ -158,6 +162,10 @@ fn invoke(src: Context, ctx_step: Context) -> Result<Context, ExitCode> {
             else { Ok(()) };
             #[cfg(not(feature = "ci_only"))]
             println!("{}", "== EOF ==========================".blue());
+            match std::io::stdout().flush() {
+                Ok(_) => {},
+                Err(_) => {}
+            }
             return last_words;
         };
         let ret: Result<(), Option<String>> = match ext {
