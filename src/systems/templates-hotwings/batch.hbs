@@ -2,7 +2,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  generateName: batch-
+  generateName: batch-{{ data.hotwings_task_id.Str }}-
   namespace: bluecheese
 spec:
   template:
