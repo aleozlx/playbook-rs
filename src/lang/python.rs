@@ -8,6 +8,15 @@ use pyo3::prelude::*;
 #[cfg(feature = "lang_python")]
 use pyo3::types::PyList;
 
+/// Flush stdout & stderr
+#[cfg(feature = "lang_python")]
+fn flush_stdio(py: pyo3::Python) {
+    match py.run("sys.stdout.flush(); sys.stderr.flush()", None, None) {
+        Ok(_) => {}
+        Err(_) => {}
+    }
+}
+
 #[cfg(feature = "lang_python")]
 pub fn invoke(src: Context, ctx_step: Context) -> Result<(), TaskError> {
     let gil = Python::acquire_gil();
@@ -41,9 +50,13 @@ pub fn invoke(src: Context, ctx_step: Context) -> Result<(), TaskError> {
     if let Ok(mod_py) = py.import(mod_name) {
         let ref action: String = ctx_step.unpack("action").unwrap();
         match mod_py.call_method1(action, (ctx_step.to_object(py), )) {
-            Ok(_) => Ok(()),
+            Ok(_) => {
+                flush_stdio(py);
+                Ok(())
+            },
             Err(e) => {
-                e.print(py);
+                flush_stdio(py);
+                e.print_and_set_sys_last_vars(py);
                 Err(TaskError { msg: String::from("There was an exception raised by the step action."), src: TaskErrorSource::Internal })
             }
         }
