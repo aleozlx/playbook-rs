@@ -34,6 +34,8 @@ spec:
             readOnly: true
           working_dir: /home/{{ data.hotwings_user.Str }}/current-ro
       restartPolicy: Never
+      nodeSelector:
+        workset: gpu
   backoffLimit: 1
 {{!-- # refs:
 # https://github.com/kubernetes-client/python/blob/master/kubernetes/docs/CoreV1Api.md
