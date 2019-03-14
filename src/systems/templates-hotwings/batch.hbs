@@ -5,6 +5,7 @@ metadata:
   generateName: batch-{{ data.hotwings_task_id.Str }}-
   namespace: bluecheese
 spec:
+  ttlSecondsAfterFinished: 20
   template:
     metadata:
       name: bluecheese
