@@ -42,7 +42,7 @@ or without Python:
 cargo install playbook --no-default-features --features "base"
 ```
 
-## How to add steps?
+## In a nutshell
 
 1. Add a function `def something(ctx)`. Current execution context is in `ctx` as dict. Keys can also be accessed as attributes to save a lot of brackets and quotes. And be sure to declare this function to playbook as a symbol.
 
@@ -57,6 +57,7 @@ def something(ctx):
 2. Add the source file path to the `whitelist`.
 
 ```yml
+## main.yml ##
 whitelist:
 - src: hello_world.py
 ```
@@ -64,11 +65,22 @@ whitelist:
 3. Add an entry to your YAML file in `steps` where `action` is the step function name
 
 ```yml
+## main.yml ##
+whitelist:
+- src: hello_world.py
 steps:
-  - name: Some description here
-    action: something
-    message: Hello World!
+- name: Some description here
+  action: something
+  message: Hello World!
 ```
+
+4. Run it!
+
+```bash
+$ playbook main.yml
+```
+
+Check Wiki for more details and examples.
 
 # FAQ
 
