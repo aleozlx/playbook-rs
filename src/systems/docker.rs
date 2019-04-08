@@ -177,10 +177,9 @@ pub fn start<I, S>(ctx_docker: Context, cmd: I) -> Result<String, TaskError>
                         })
                     },
                     WaitStatus::Stopped(_, _sig) => unreachable!(),
-                    WaitStatus::PtraceEvent(..) => unimplemented!(),
-                    WaitStatus::PtraceSyscall(_) => unimplemented!(),
                     WaitStatus::Continued(_) => unreachable!(),
-                    WaitStatus::StillAlive => unreachable!()
+                    WaitStatus::StillAlive => unreachable!(),
+                    _ => unimplemented!()
                 },
                 Err(e) => Err(TaskError { msg: String::from("Failed to keep track of the child process."), src: TaskErrorSource::NixError(e) })
             }
