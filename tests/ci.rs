@@ -192,8 +192,6 @@ mod test_hotwings {
                 for resource in resources {
                     let (ref api, ref body) = resource;
                     if api == "api_job" {
-                        // println!("{}", body[..558].to_owned());
-                        // assert_eq!(body[..558], include_str!("fixtures/batch-basic.yml")[..558]);
                         assert_eq!(body, include_str!("fixtures/batch-basic.yml"));
                     }
                     
@@ -203,22 +201,46 @@ mod test_hotwings {
         }
     }
 
-    // #[test]
-    // fn hotwings_gpus() {
-    //     let raw = playbook_api::load_yaml("tests/test3/request_gpus.yml").expect("Cannot load test playbook.");
-    //     let ctx_docker = raw.subcontext("docker").unwrap();
-    //     let cmd = vec![String::from("main.yml")];
-    //     match hotwings::k8s_api(ctx_docker, cmd) {
-    //         Ok(resources) => {
-    //             for resource in resources {
-    //                 let (ref api, ref body) = resource;
-    //                 if api == "api_job" {
-    //                     assert_eq!(body, include_str!("fixtures/batch-basic.yml"));
-    //                 }
-    //             }
-    //         }
-    //         Err(e) => { panic!("{}", e); }
-    //     }
-    // }
+    #[test]
+    fn hotwings_gpus() {
+        let raw = playbook_api::load_yaml("tests/test3/request_gpus.yml").expect("Cannot load test playbook.");
+        let username = "hotwings";
+        let ctx_docker = raw.subcontext("docker").unwrap()
+            .set("hotwings_user", CtxObj::Str(username.to_owned()))
+            .set("hotwings_task_id", CtxObj::Str(String::from("some-taskid")));
+        let cmd = vec![String::from("main.yml")];
+        match hotwings::k8s_api(ctx_docker, cmd) {
+            Ok(resources) => {
+                for resource in resources {
+                    let (ref api, ref body) = resource;
+                    if api == "api_job" {
+                        assert_eq!(body, include_str!("fixtures/k8s_request_gpus.yml"));
+                    }
+                }
+            }
+            Err(e) => { panic!("{}", e); }
+        }
+    }
+
+    #[test]
+    fn hotwings_gpus2() {
+        let raw = playbook_api::load_yaml("tests/test3/request_gpus2.yml").expect("Cannot load test playbook.");
+        let username = "hotwings";
+        let ctx_docker = raw.subcontext("docker").unwrap()
+            .set("hotwings_user", CtxObj::Str(username.to_owned()))
+            .set("hotwings_task_id", CtxObj::Str(String::from("some-taskid")));
+        let cmd = vec![String::from("main.yml")];
+        match hotwings::k8s_api(ctx_docker, cmd) {
+            Ok(resources) => {
+                for resource in resources {
+                    let (ref api, ref body) = resource;
+                    if api == "api_job" {
+                        assert_eq!(body, include_str!("fixtures/k8s_request_gpus2.yml"));
+                    }
+                }
+            }
+            Err(e) => { panic!("{}", e); }
+        }
+    }
 }
 

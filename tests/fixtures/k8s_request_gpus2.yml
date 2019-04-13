@@ -1,0 +1,45 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  generateName: batch-some-taskid-
+  namespace: bluecheese
+spec:
+  ttlSecondsAfterFinished: 20
+  template:
+    metadata:
+      name: bluecheese
+    spec:
+      volumes:
+        - name: public-ro
+          persistentVolumeClaim:
+            claimName: public-ro-claim
+        - name: current-ro
+          persistentVolumeClaim:
+            claimName: current-ro-claim-some-taskid
+      containers:
+        - name: step
+          image: aleozlx/compute-pi-tf
+          command: ['playbook']
+          args: ['main.yml']
+          imagePullPolicy: Always
+          tty: true
+          stdin: true
+          env:
+          - name: PYTHONUNBUFFERED
+            value: "1"
+          volumeMounts:
+          - name: public-ro
+            mountPath: /data/public-ro
+            readOnly: true
+          - name: current-ro
+            mountPath: /home/hotwings/current-ro
+            readOnly: true
+          working_dir: /home/hotwings/current-ro
+          resources:
+            limits:
+              nvidia.com/gpu: 2
+      restartPolicy: Never
+      nodeSelector:
+        workset: gpu
+  backoffLimit: 1

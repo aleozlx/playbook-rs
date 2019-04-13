@@ -1,0 +1,15 @@
+whitelist:
+- src: task.py
+docker:
+  image: aleozlx/compute-pi-tf
+  runtime: nvidia
+  interactive: true
+  impersonate: dynamic
+  vars:
+    playbook: /home/hotwings/current-ro/main-inpod.yml
+  gpus: 2
+num_samples: 10000000000
+batch_size: 6553600
+steps:
+- name: 'Estimate pi using the "dartboard" method'
+  action: main%   
