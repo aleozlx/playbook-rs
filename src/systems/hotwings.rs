@@ -91,8 +91,13 @@ pub fn k8s_api<I, S>(ctx_docker: Context, cmd: I) -> Result<Vec<(String, String)
 {
     let renderer = get_renderer();
     let cmd_str: Vec<String> = cmd.into_iter().map(|s| s.as_ref().to_str().unwrap().to_owned()).collect();
+    let env_nfs_server = std::env::var("HOTWINGS_NFS_SERVER").expect("Missing environment variable HOTWINGS_NFS_SERVER?");
+    let env_currentro_quota = std::env::var("HOTWINGS_CURRENTRO_QUOTA").expect("Missing environment variable HOTWINGS_CURRENTRO_QUOTA?");
     let ctx_modded = ctx_docker
-        .set("command_str", CtxObj::Str(format!("[{}]", cmd_str.iter().map(|s| format!("'{}'", s)).collect::<Vec<String>>().join(","))));
+        .set("command_str", CtxObj::Str(format!("[{}]", cmd_str.iter().map(|s| format!("'{}'", s)).collect::<Vec<String>>().join(","))))
+        .set("hotwings_nfs_server", CtxObj::Str(env_nfs_server.to_owned()))
+        .set("hotwings_currentro_quota", CtxObj::Str(env_currentro_quota.to_owned())) // ! How to scale up/down?
+        ;
     Ok(vec![
         (String::from("api_pv"), renderer.render("pv-current-ro", &ctx_modded)?),
         (String::from("api_pvc"), renderer.render("pvc-current-ro", &ctx_modded)?),

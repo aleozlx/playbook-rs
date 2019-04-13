@@ -6,7 +6,7 @@ metadata:
   namespace: bluecheese
 spec:
   capacity:
-    storage: 100Mi
+    storage: {{ data.hotwings_currentro_quota.Str }}
   volumeMode: Filesystem
   accessModes:
     - ReadOnlyMany
@@ -17,7 +17,7 @@ spec:
     - nfsvers=4
   nfs:
     path: /hotwings/current-ro/{{ data.hotwings_task_id.Str }}
-    server: 172.16.200.161
+    server: {{ data.hotwings_nfs_server.Str }}
   claimRef:
     namespace: bluecheese
     name: current-ro-claim-{{ data.hotwings_task_id.Str }}
