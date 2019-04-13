@@ -23,6 +23,8 @@ spec:
           command: ["playbook"]
           args: {{{ data.command_str.Str }}}
           imagePullPolicy: Always
+          tty: true
+          stdin: true
           env:
           - name: PYTHONUNBUFFERED
             value: "1"
