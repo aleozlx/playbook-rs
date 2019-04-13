@@ -45,9 +45,20 @@ impl Infrastructure for Hotwings {
         // crate::copy_user_info(&mut userinfo, &username);
         let home = format!("/home/{}", &username);
         let playbook_from: String = ctx_docker.unpack("playbook-from").unwrap();
+        let env_nfs_server = std::env::var("HOTWINGS_NFS_SERVER").expect("Missing environment variable HOTWINGS_NFS_SERVER?");
+        let env_currentro_quota = std::env::var("HOTWINGS_CURRENTRO_QUOTA").expect("Missing environment variable HOTWINGS_CURRENTRO_QUOTA?");
         let ctx_modded = ctx_docker
             .set("hotwings_user", CtxObj::Str(username.to_owned()))
-            .set("hotwings_task_id", CtxObj::Str(get_task_id(&playbook_from)));
+            .set("hotwings_task_id", CtxObj::Str(get_task_id(&playbook_from)))
+            .set("hotwings_nfs_server", CtxObj::Str(env_nfs_server.to_owned()))
+            .set("hotwings_currentro_quota", CtxObj::Str(env_currentro_quota.to_owned())) // ! How to scale up/down?
+            .set("hotwings_nvidia", CtxObj::Bool(ctx_docker.unpack("runtime").unwrap_or(String::from("")) == String::from("nvidia")))
+            .set("hotwings_gpus", CtxObj::Int(
+                if ctx_docker.unpack("runtime").unwrap_or(String::from("")) == String::from("nvidia") {
+                    ctx_docker.unpack("gpus").unwrap_or(1i64)
+                }
+                else { 0 }
+            ));
 
         match k8s_api(ctx_modded, cmd) {
             Ok(resources) => {
@@ -91,13 +102,8 @@ pub fn k8s_api<I, S>(ctx_docker: Context, cmd: I) -> Result<Vec<(String, String)
 {
     let renderer = get_renderer();
     let cmd_str: Vec<String> = cmd.into_iter().map(|s| s.as_ref().to_str().unwrap().to_owned()).collect();
-    let env_nfs_server = std::env::var("HOTWINGS_NFS_SERVER").expect("Missing environment variable HOTWINGS_NFS_SERVER?");
-    let env_currentro_quota = std::env::var("HOTWINGS_CURRENTRO_QUOTA").expect("Missing environment variable HOTWINGS_CURRENTRO_QUOTA?");
     let ctx_modded = ctx_docker
-        .set("command_str", CtxObj::Str(format!("[{}]", cmd_str.iter().map(|s| format!("'{}'", s)).collect::<Vec<String>>().join(","))))
-        .set("hotwings_nfs_server", CtxObj::Str(env_nfs_server.to_owned()))
-        .set("hotwings_currentro_quota", CtxObj::Str(env_currentro_quota.to_owned())) // ! How to scale up/down?
-        ;
+        .set("command_str", CtxObj::Str(format!("[{}]", cmd_str.iter().map(|s| format!("'{}'", s)).collect::<Vec<String>>().join(","))));
     Ok(vec![
         (String::from("api_pv"), renderer.render("pv-current-ro", &ctx_modded)?),
         (String::from("api_pvc"), renderer.render("pvc-current-ro", &ctx_modded)?),

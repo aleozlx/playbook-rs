@@ -20,7 +20,7 @@ spec:
       containers:
         - name: step
           image: {{ data.image.Str }}
-          command: ["playbook"]
+          command: ['playbook']
           args: {{{ data.command_str.Str }}}
           imagePullPolicy: Always
           tty: true
@@ -36,6 +36,13 @@ spec:
             mountPath: /home/{{ data.hotwings_user.Str }}/current-ro
             readOnly: true
           working_dir: /home/{{ data.hotwings_user.Str }}/current-ro
+          resources:
+            limits:
+            {{~#if data.hotwings_nvidia.Bool}}
+              nvidia.com/gpu: {{ data.hotwings_gpus.Int }}
+            {{~else}}
+              nvidia.com/gpu: 0
+            {{~/if}}
       restartPolicy: Never
       nodeSelector:
         workset: gpu
