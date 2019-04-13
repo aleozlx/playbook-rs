@@ -33,13 +33,7 @@ YAML driven container orchestration with infrastructure and language abstraction
 ## Installation
 
 ```sh
-cargo +nightly install playbook
-```
-
-or without Python:
-
-```sh
-cargo install playbook --no-default-features --features "base"
+cargo install playbook
 ```
 
 ## In a nutshell

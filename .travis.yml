@@ -6,13 +6,13 @@ cache: cargo
 matrix:
   include:
   - rust: stable
-    env: FEATURES="--no-default-features --features base,ci_only" GUEST_FEATURES="ci_only,agent"
+    env: FEATURES="--features ci_only" GUEST_FEATURES="ci_only,agent"
   - rust: beta
-    env: FEATURES="--no-default-features --features base,ci_only" GUEST_FEATURES="ci_only,agent"
+    env: FEATURES="--features ci_only" GUEST_FEATURES="ci_only,agent"
   - rust: nightly
-    env: FEATURES="--no-default-features --features base,ci_only" GUEST_FEATURES="ci_only,agent"
+    env: FEATURES="--features ci_only" GUEST_FEATURES="ci_only,agent"
   - rust: stable
-    env: FEATURES="--no-default-features --features base,ci_only" GUEST_FEATURES="ci_only,agent,lang_python"
+    env: FEATURES="--features ci_only" GUEST_FEATURES="ci_only,agent,lang_python"
 before_install:
 - docker pull aleozlx/playbook-test:base
 - docker build -t aleozlx/playbook-test:test1 --build-arg GUEST_FEATURES=${GUEST_FEATURES} tests/test1

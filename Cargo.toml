@@ -1,6 +1,6 @@
 [package]
 name = "playbook"
-version = "0.4.0"
+version = "0.4.1"
 authors = ["Alex Yang <aleozlx@gmail.com>"]
 description = "YAML driven Docker DevOps"
 license = "Apache-2.0 OR MIT"
@@ -11,10 +11,7 @@ repository = "https://github.com/aleozlx/playbook-rs.git"
 name = "playbook_api"
 
 [features]
-base = []
-
-# Our people is a little biased towards Python, which seems fair.
-default = ["lang_python"]
+default = []
 
 # Python language support
 lang_python = ["pyo3", "ymlctx/topyobject"]
