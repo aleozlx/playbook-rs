@@ -1,6 +1,6 @@
 [package]
 name = "playbook"
-version = "0.4.1"
+version = "0.4.2"
 authors = ["Alex Yang <aleozlx@gmail.com>"]
 description = "YAML driven Docker DevOps"
 license = "Apache-2.0 OR MIT"
@@ -35,23 +35,23 @@ sandbox = []
 sys_hotwings = ["lang_python", "as_switch"]
 
 [dependencies]
-yaml-rust = "^0.4"
+yaml-rust = "0.4"
 colored = "1.6"
 log = "0.4"
 fern = "0.5"
-chrono = "^0.4"
-clap = "^2.32.0"
-ymlctx = "0.1.7"
+chrono = "0.4"
+clap = "2.32.0"
+ymlctx = "0.1.8"
 pyo3 = { version = "0.5", optional = true }
 regex = "1"
-nix = "^0.11"
+nix = "0.11"
 impersonate = "0.0.3"
 dirs = "1.0.4"
 serde_json = "1.0"
-serde = "^1.0.82"
-serde_derive = "^1.0.82"
-itertools = "^0.8.0"
-handlebars = { version = "^1.1.0", optional = true }
+serde = "1.0.90"
+serde_derive = "1.0.90"
+itertools = "0.8"
+handlebars = { version = "1.1.0", optional = true }
 
 [dev-dependencies]
 tempfile = "3.0.5"

@@ -215,22 +215,14 @@ fn fork_pool(grid: Vec<Context>, pool: &Vec<CtxObj>) -> TransientContext {
 /// 
 /// **Example(s)**
 /// ```yaml
-/// action: sys_var
-/// states:
-///   from: pipe!
 /// ---
 /// action: sys_var
 /// states:
 ///   from: another.yml
-/// ---
-/// action: sys_var
-/// states:
-///   from: postgresql://user:passwd@host/db
 /// ```
 pub fn vars(ctx: Context) -> TransientContext {
     if let Some(CtxObj::Context(ctx_states)) = ctx.get("states") {
         if let Some(CtxObj::Str(url)) = ctx_states.get("from") {
-            // * may support both file & database in the future
             let ref playbook: String = ctx.unpack("playbook").unwrap();
             let playbook_dir;
             if let Some(parent) = Path::new(playbook).parent() {
