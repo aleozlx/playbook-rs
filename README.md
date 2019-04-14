@@ -8,7 +8,7 @@
 ![Language](https://img.shields.io/github/languages/top/aleozlx/playbook-rs.svg?style=flat-square)
 
 
-YAML driven container orchestration with infrastructure and language abstraction!
+YAML driven container workflow orchestration
 
 ## Features
 
@@ -26,15 +26,7 @@ YAML driven container orchestration with infrastructure and language abstraction
 
 ## Dependencies
 
-* Docker CE
-* (Optional) Python
-* (Optional) nvidia-docker2
-
-## Installation
-
-```sh
-cargo install playbook
-```
+* (Optional) Docker CE
 
 ## In a nutshell
 
@@ -100,6 +92,6 @@ Kubernetes focuses on workload, this focuses on workflow.
 Firstly, any scripting language is out of the question because it is much more difficult to build a system with high reliability and sustainability requirements with languages so dynamic and tolerant to errors.
 We want the system to crash hard when there is the slightest amount of outdated codes or data structures and it better does not even compile, so that we become aware of it in the earliest time possible, as opposed to well after built into containers and delivered to users.
 
-Secondly, the best AOT compiled (commitment-free) languages out there (imo) are C++, Rust and Go.
+Secondly, the best AOT compiled commitment-free languages out there, imo, are C++, Rust and Go.
 
 Lastly, we want to have a nice package manager, so Rust is the only option here.
