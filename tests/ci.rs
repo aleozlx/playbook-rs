@@ -139,8 +139,10 @@ mod test_parallelism {
                 let counter: Vec<usize> = std::fs::read_dir(scratch.path()).unwrap().map(
                     |f| {
                         if let Ok(entry) = f {
-                            if entry.path().is_file() /*&& entry.path().to_str().unwrap().starts_with("ctxdump-")*/ {
+                            if entry.path().is_file() && entry.path().file_name().unwrap().to_str().unwrap().starts_with("ctxdump-") {
                                 println!("{:?}", entry.path());
+                                let contents = std::fs::read_to_string(entry.path()).unwrap();
+                                println!("{}", contents);
                                 return 1;
                             }
                         }

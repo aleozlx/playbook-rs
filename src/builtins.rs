@@ -205,7 +205,8 @@ fn param_space_iter<'a, G>(grid: G) -> impl Iterator<Item = Context> + 'a
 fn ctxdump(ctx: Context) -> TransientContext {
     if let Some(CtxObj::Str(ctxdump)) = ctx.get("ctxdump") {
         let path = Path::new(ctxdump).to_path_buf();
-        match File::create(path.join(format!("ctxdump-{}.yml", uuid::Uuid::new_v4()))) {
+        let ctx_seed = format!("{}", ctx).into_bytes();
+        match File::create(path.join(format!("ctxdump-{}.yml", uuid::Uuid::new_v5(&uuid::Uuid::NAMESPACE_URL, &ctx_seed)))) {
             Ok(mut file) => {
                 let contents = format!("{}", ctx);
                 match file.write_all(contents.as_bytes()) {
