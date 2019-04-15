@@ -202,11 +202,15 @@ fn param_space_iter<'a, G>(grid: G) -> impl Iterator<Item = Context> + 'a
     })
 }
 
+fn uuid_from_ctx(ctx: &Context) -> String {
+    let ctx_seed = format!("{}", ctx).into_bytes();
+    format!("{}", uuid::Uuid::new_v5(&uuid::Uuid::NAMESPACE_URL, &ctx_seed)
+}
+
 fn ctxdump(ctx: Context) -> TransientContext {
     if let Some(CtxObj::Str(ctxdump)) = ctx.get("ctxdump") {
         let path = Path::new(ctxdump).to_path_buf();
-        let ctx_seed = format!("{}", ctx).into_bytes();
-        match File::create(path.join(format!("ctxdump-{}.yml", uuid::Uuid::new_v5(&uuid::Uuid::NAMESPACE_URL, &ctx_seed)))) {
+        match File::create(path.join(format!("ctxdump-{}.yml", uuid_from_ctx(&ctx)))) {
             Ok(mut file) => {
                 let contents = format!("{}", ctx);
                 match file.write_all(contents.as_bytes()) {
@@ -229,7 +233,9 @@ fn fork_nolimit(grid: Vec<Context>) -> TransientContext {
     for ctx in param_space_iter(&grid) {
         match nix::unistd::fork() {
             Ok(ForkResult::Child) => {
-                return TransientContext::Stateful(ctx.set("_exit", CtxObj::Bool(true)));
+                return TransientContext::Stateful(ctx
+                        .set("_exit", CtxObj::Bool(true))
+                        .set("fork_uuid", CtxObj::Str(uuid_from_ctx(&ctx))))
             }
             Ok(ForkResult::Parent { child, .. }) => {
                 children.push(child);
