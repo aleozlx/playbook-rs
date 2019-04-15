@@ -392,6 +392,16 @@ fn get_steps(raw: Context) -> Result<(Vec<Context>, Context), ExitCode> {
     }
 }
 
+/// Correctly exit from a sys_fork action
+fn maybe_exit(exit_code: ExitCode, ctx_states: &Context) -> ExitCode {
+    if let Some(CtxObj::Bool(noreturn)) = ctx_states.get("_exit") {
+        if *noreturn {
+            unsafe { libc::_exit(0); }
+        }
+    }
+    exit_code
+}
+
 pub fn run_playbook(raw: Context, ctx_args: Context) -> Result<(), ExitCode> {
     let mut ctx_states = Box::new(Context::new());
     let (steps, ctx_global) = match get_steps(raw) {
@@ -431,20 +441,14 @@ pub fn run_playbook(raw: Context, ctx_args: Context) -> Result<(), ExitCode> {
                 TransientContext::Stateful(ctx_pipe) => {
                     ctx_states = Box::new(ctx_states.overlay(&ctx_pipe));
                 }
-                TransientContext::Diverging(exit_code) => match exit_code {
+                TransientContext::Diverging(exit_code) => match maybe_exit(exit_code, &ctx_states) {
                     ExitCode::Success => { return Ok(()); }
-                    _ => { return Err(exit_code); }
+                    exit_code @ _ => { return Err(exit_code); }
                 }
             }
         }
-        if let Some(CtxObj::Bool(noreturn)) = ctx_states.get("_exit") {
-            if *noreturn {
-                // Correctly exit from a sys_fork action
-                unsafe { libc::_exit(0); }
-            }
-            else { Ok(()) }
-        }
-        else { Ok(()) }
+        maybe_exit(ExitCode::Success, &ctx_states);
+        Ok(())
     }
 }
 

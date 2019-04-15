@@ -73,6 +73,7 @@ pub fn resolve<'step>(ctx_step: &'step Context) -> (Option<&'step str>, Option<B
             "sys_shell" => (Some(action), Some(shell)),
             "sys_vars" => (Some(action), Some(vars)),
             "sys_fork" => (Some(action), Some(fork)),
+            "sys_ctxdump" => (Some(action), Some(ctxdump)),
             _ => (Some(action), None)
         }
     }
@@ -201,29 +202,32 @@ fn param_space_iter<'a, G>(grid: G) -> impl Iterator<Item = Context> + 'a
     })
 }
 
+fn ctxdump(ctx: Context) -> TransientContext {
+    if let Some(CtxObj::Str(ctxdump)) = ctx.get("ctxdump") {
+        let path = Path::new(ctxdump).to_path_buf();
+        match File::create(path.join(format!("ctxdump-{}.yml", uuid::Uuid::new_v4()))) {
+            Ok(mut file) => {
+                let contents = format!("{}", ctx);
+                match file.write_all(contents.as_bytes()) {
+                    Err(why) => {
+                        eprintln!("Warning: Failed to dump context: {}", why);
+                    }
+                    _ => {}
+                }
+            }
+            Err(why) => {
+                eprintln!("Warning: Failed to dump context: {}", why);
+            }
+        };
+    }
+    TransientContext::Stateless(Context::new())
+}
+
 fn fork_nolimit(grid: Vec<Context>) -> TransientContext {
     let mut children = Vec::new();
     for ctx in param_space_iter(&grid) {
         match nix::unistd::fork() {
             Ok(ForkResult::Child) => {
-                if let Some(CtxObj::Str(ctxdump)) = ctx.get("ctxdump") {
-                    let path = Path::new(ctxdump).to_path_buf();
-                    println!("scratch path {} (before write)", path.exists());
-                    match File::create(path.join(format!("ctxdump-{}.yml", uuid::Uuid::new_v4()))) {
-                        Ok(mut file) => {
-                            let contents = format!("{}", ctx);
-                            match file.write_all(contents.as_bytes()) {
-                                Err(why) => {
-                                    eprintln!("Warning: Failed to dump context: {}", why);
-                                }
-                                _ => {}
-                            }
-                        }
-                        Err(why) => {
-                            eprintln!("Warning: Failed to dump context: {}", why);
-                        }
-                    };
-                }
                 return TransientContext::Stateful(ctx.set("_exit", CtxObj::Bool(true)));
             }
             Ok(ForkResult::Parent { child, .. }) => {

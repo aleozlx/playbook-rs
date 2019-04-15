@@ -134,15 +134,13 @@ mod test_parallelism {
             .set("ctxdump", CtxObj::Str(scratch.path().to_str().unwrap().to_owned()));
         let ctx_args = Context::new()
             .set("playbook", CtxObj::Str(String::from("tests/test2/fork_simple.yml")));
-        println!("scratch path {}", scratch.path().exists());
         match playbook_api::run_playbook(playbook, ctx_args) {
             Ok(()) => {
-                println!("scratch path {}", scratch.path().exists());
-                println!("scratch {}", String::from_utf8(std::process::Command::new("ls -l /tmp").output().unwrap().stdout).unwrap());
                 let counter: Vec<usize> = std::fs::read_dir(scratch.path()).unwrap().map(
                     |f| {
                         if let Ok(entry) = f {
-                            if entry.path().is_file() && entry.path().to_str().unwrap().starts_with("ctxdump-") {
+                            if entry.path().is_file() /*&& entry.path().to_str().unwrap().starts_with("ctxdump-")*/ {
+                                println!("{:?}", entry.path());
                                 return 1;
                             }
                         }
