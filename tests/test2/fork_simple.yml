@@ -6,4 +6,5 @@ steps:
   - param1: [0, 1, 5]
   - param2: [10, 20, 40, 80, 160]
   - param3: [0.03, 0.01, 0.003, 0.001]
-  
+- name: Quit
+  action: sys_exit

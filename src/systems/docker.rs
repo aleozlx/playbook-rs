@@ -53,7 +53,7 @@ pub fn start<I, S>(ctx_docker: Context, cmd: I) -> Result<String, TaskError>
             docker_run.push(String::from("-it"));
         }
         else {
-            // ! BUG PyO3 & Python don't print without either -u or -t
+            // * PyO3 & Python don't print without either -u or -t
             docker_run.push(String::from("-t"));
         }
     }

@@ -14,6 +14,8 @@ extern crate regex;
 extern crate nix;
 extern crate impersonate;
 extern crate serde_json;
+extern crate uuid;
+extern crate libc;
 
 #[cfg(feature = "lang_python")]
 extern crate pyo3;
@@ -435,7 +437,14 @@ pub fn run_playbook(raw: Context, ctx_args: Context) -> Result<(), ExitCode> {
                 }
             }
         }
-        Ok(())
+        if let Some(CtxObj::Bool(noreturn)) = ctx_states.get("_exit") {
+            if *noreturn {
+                // Correctly exit from a sys_fork action
+                unsafe { libc::_exit(0); }
+            }
+            else { Ok(()) }
+        }
+        else { Ok(()) }
     }
 }
 

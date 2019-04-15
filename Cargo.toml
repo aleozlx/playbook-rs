@@ -52,6 +52,8 @@ serde = "1.0.90"
 serde_derive = "1.0.90"
 itertools = "0.8"
 handlebars = { version = "1.1.0", optional = true }
+uuid = { version = "0.7", features = ["v4"] }
+libc = "0.2"
 
 [dev-dependencies]
 tempfile = "3.0.5"

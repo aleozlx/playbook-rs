@@ -1,5 +1,9 @@
 use crate::systems::docker;
 use std::path::Path;
+use std::fs::File;
+use std::io::Write;
+use nix::unistd::ForkResult;
+use nix::sys::wait::{waitpid, WaitStatus};
 use colored::*;
 use yaml_rust::YamlLoader;
 use ymlctx::context::{Context, CtxObj};
@@ -198,14 +202,67 @@ fn param_space_iter<'a, G>(grid: G) -> impl Iterator<Item = Context> + 'a
 }
 
 fn fork_nolimit(grid: Vec<Context>) -> TransientContext {
+    let mut children = Vec::new();
     for ctx in param_space_iter(&grid) {
-        println!("{}", ctx);
+        match nix::unistd::fork() {
+            Ok(ForkResult::Child) => {
+                if let Some(CtxObj::Str(ctxdump)) = ctx.get("ctxdump") {
+                    let path = Path::new(ctxdump).to_path_buf();
+                    println!("scratch path {} (before write)", path.exists());
+                    match File::create(path.join(format!("ctxdump-{}.yml", uuid::Uuid::new_v4()))) {
+                        Ok(mut file) => {
+                            let contents = format!("{}", ctx);
+                            match file.write_all(contents.as_bytes()) {
+                                Err(why) => {
+                                    eprintln!("Warning: Failed to dump context: {}", why);
+                                }
+                                _ => {}
+                            }
+                        }
+                        Err(why) => {
+                            eprintln!("Warning: Failed to dump context: {}", why);
+                        }
+                    };
+                }
+                return TransientContext::Stateful(ctx.set("_exit", CtxObj::Bool(true)));
+            }
+            Ok(ForkResult::Parent { child, .. }) => {
+                children.push(child);
+            }
+            Err(_) => {
+                error!("Failed to fork a new process.");
+                return TransientContext::Diverging(ExitCode::ErrSys);
+            }
+        }
     }
-    TransientContext::Diverging(ExitCode::Success) // TODO WIP
-    // panic!();
+    let mut exitcode = ExitCode::Success;
+    for child in children {
+        match waitpid(child, None) {
+            Ok(status) => match status {
+                WaitStatus::Exited(_, exit_code) => {
+                    if exit_code != 0 {
+                        exitcode = ExitCode::ErrTask
+                    }
+                },
+                WaitStatus::Signaled(_, _sig, _core_dump) => {
+                    exitcode = ExitCode::ErrTask
+                },
+                WaitStatus::Stopped(_, _sig) => unreachable!(),
+                WaitStatus::Continued(_) => unreachable!(),
+                WaitStatus::StillAlive => unreachable!(),
+                _ => unimplemented!()
+            },
+            Err(e) => {
+                error!("Failed to keep track of the child process: {}", e);
+                exitcode = ExitCode::ErrSys;
+            }
+        }
+    }
+    TransientContext::Diverging(exitcode)
 }
 
 fn fork_pool(grid: Vec<Context>, pool: &Vec<CtxObj>) -> TransientContext {
+    unimplemented!();
     let nproc = pool.len();
     TransientContext::Diverging(ExitCode::ErrSys)
 }
