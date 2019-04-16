@@ -204,7 +204,7 @@ fn param_space_iter<'a, G>(grid: G) -> impl Iterator<Item = Context> + 'a
 
 fn uuid_from_ctx(ctx: &Context) -> String {
     let ctx_seed = format!("{}", ctx).into_bytes();
-    format!("{}", uuid::Uuid::new_v5(&uuid::Uuid::NAMESPACE_URL, &ctx_seed)
+    format!("{}", uuid::Uuid::new_v5(&uuid::Uuid::NAMESPACE_URL, &ctx_seed))
 }
 
 fn ctxdump(ctx: Context) -> TransientContext {
